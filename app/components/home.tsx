@@ -31,6 +31,7 @@ export default function Home() {
   const [selectedDrug, setSelectedDrug] = useState('');
   const [selectedDisease, setSelectedDisease] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
 
   const [overallStudyType, setOverallStudyType] = useState({
     pk: {
@@ -120,7 +121,7 @@ export default function Home() {
       color: populationData.map(d => d.color),
       line: { width: 1, color: '#374151' }
     },
-    text: populationData.map(d => d.pk),
+    text: populationData.map(d => d.pk.toString()),
     textposition: 'outside' as const,
     textfont: { size: 16 }
   }];
@@ -133,7 +134,7 @@ export default function Home() {
       color: populationData.map(d => d.color),
       line: { width: 1, color: '#374151' }
     },
-    text: populationData.map(d => d.pharm),
+    text: populationData.map(d => d.pharm.toString()),
     textposition: 'outside' as const,
     textfont: { size: 16 }
   }];
@@ -146,7 +147,7 @@ export default function Home() {
       color: clinicalData.map(d => d.color),
       line: { width: 1, color: '#374151' }
     },
-    text: clinicalData.map(d => d.clinical),
+    text: clinicalData.map(d => d.clinical.toString()),
     textposition: 'outside' as const,
     textfont: { size: 16 }
   }];
@@ -182,10 +183,29 @@ export default function Home() {
 
       <div className="flex">
         {/* Left Sidebar */}
-        <div className="w-64 bg-gray-100 min-h-screen p-2">
-          <Accordion.Root type="multiple" defaultValue={["search"]} className="space-y-4">
-            {/* Search Section */}
-            <Accordion.Item value="search" className="bg-white rounded-lg shadow-sm">
+        <div className={`${sidebarExpanded ? 'w-64' : 'w-16'} bg-gray-100 min-h-screen transition-all duration-300 ease-in-out relative`}>
+          {/* Toggle Button */}
+          <button
+            onClick={() => setSidebarExpanded(!sidebarExpanded)}
+            className="absolute top-2 right-2 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors z-10 shadow-md"
+            title={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
+          >
+            {sidebarExpanded ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            )}
+          </button>
+          
+          <div className={`${sidebarExpanded ? 'p-2' : 'p-1'} overflow-hidden mt-8`}>
+          {sidebarExpanded ? (
+            <Accordion.Root type="multiple" defaultValue={["search"]} className="space-y-4">
+              {/* Search Section */}
+              <Accordion.Item value="search" className="bg-white rounded-lg shadow-sm">
               <Accordion.Trigger className="flex items-center justify-between w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
                 <div className="flex items-center space-x-2">
                   <Search className="w-5 h-5 text-gray-600" />
@@ -338,6 +358,18 @@ export default function Home() {
               </Accordion.Content>
             </Accordion.Item>
           </Accordion.Root>
+          ) : (
+            // Collapsed sidebar - show only icons
+            <div className="space-y-4 pt-4">
+              <div className="bg-white rounded-lg shadow-sm p-3 hover:bg-gray-50 transition-colors cursor-pointer" title="Search">
+                <Search className="w-5 h-5 text-gray-600 mx-auto" />
+              </div>
+              <div className="bg-white rounded-lg shadow-sm p-3 hover:bg-gray-50 transition-colors cursor-pointer" title="Download Data">
+                <Download className="w-5 h-5 text-gray-600 mx-auto" />
+              </div>
+            </div>
+          )}
+          </div>
         </div>
 
         {/* Main Content */}
