@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import * as Accordion from '@radix-ui/react-accordion';
 import * as Select from '@radix-ui/react-select';
+import VirtualizedSelect from './VirtualizedSelect';
 
 import { getDiseaseList, getDrugList, getOverallStudyType, postTest } from "../dataprovider/dataaccessor";
 
@@ -30,11 +31,7 @@ export default function Home() {
   const [selectedDrug, setSelectedDrug] = useState('');
   const [selectedDisease, setSelectedDisease] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
-  const [drugSearchTerm, setDrugSearchTerm] = useState('');
-  const [diseaseSearchTerm, setDiseaseSearchTerm] = useState('');
-  const [drugDisplayCount, setDrugDisplayCount] = useState(50);
-  const [diseaseDisplayCount, setDiseaseDisplayCount] = useState(50);
-  const [diseaseDropdownOpen, setDiseaseDropdownOpen] = useState(false);
+
   const [overallStudyType, setOverallStudyType] = useState({
     pk: {
       count: 0,
@@ -77,18 +74,7 @@ export default function Home() {
     }
   }, [searchMode]);
 
-  // Computed properties for lazy loading
-  const filteredDrugs = drugList.filter(drug => 
-    drug.toLowerCase().includes(drugSearchTerm.toLowerCase())
-  );
-  
-  const filteredDiseases = diseaseList.filter(disease => 
-    disease.TERM.toLowerCase().includes(diseaseSearchTerm.toLowerCase()) ||
-    disease.des.toLowerCase().includes(diseaseSearchTerm.toLowerCase())
-  );
-  
-  const displayedDrugs = filteredDrugs.slice(0, drugDisplayCount);
-  const displayedDiseases = filteredDiseases.slice(0, diseaseDisplayCount);
+
   
   const populationData = [
     { name: 'Pediatric', pk: 270204, pharm: 630043, clinical: 139298, color: '#fbbf24' },
@@ -108,12 +94,12 @@ export default function Home() {
   const clinicalData = populationData.filter(item => item.clinical > 0);
 
   // Chart configurations
-  const chartLayout = {
-    margin: { l: 60, r: 20, t: 40, b: 80 },
-    showlegend: false,
-    plot_bgcolor: 'rgba(0,0,0,0)',
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    font: { size: 10 },
+      const chartLayout = {
+      margin: { l: 30, r: 20, t: 10, b: 80 },
+      showlegend: false,
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      font: { size: 14 },
     xaxis: {
       tickangle: -45,
       tickfont: { size: 10 },
@@ -134,9 +120,9 @@ export default function Home() {
       color: populationData.map(d => d.color),
       line: { width: 1, color: '#374151' }
     },
-    text: populationData.map(d => d.pk.toLocaleString()),
+    text: populationData.map(d => d.pk),
     textposition: 'outside' as const,
-    textfont: { size: 10 }
+    textfont: { size: 16 }
   }];
 
   const pharmChartData = [{
@@ -147,9 +133,9 @@ export default function Home() {
       color: populationData.map(d => d.color),
       line: { width: 1, color: '#374151' }
     },
-    text: populationData.map(d => d.pharm.toLocaleString()),
+    text: populationData.map(d => d.pharm),
     textposition: 'outside' as const,
-    textfont: { size: 10 }
+    textfont: { size: 16 }
   }];
 
   const clinicalChartData = [{
@@ -160,9 +146,9 @@ export default function Home() {
       color: clinicalData.map(d => d.color),
       line: { width: 1, color: '#374151' }
     },
-    text: clinicalData.map(d => d.clinical.toLocaleString()),
+    text: clinicalData.map(d => d.clinical),
     textposition: 'outside' as const,
-    textfont: { size: 10 }
+    textfont: { size: 16 }
   }];
 
   return (
@@ -196,7 +182,7 @@ export default function Home() {
 
       <div className="flex">
         {/* Left Sidebar */}
-        <div className="w-80 bg-gray-100 min-h-screen p-6">
+        <div className="w-64 bg-gray-100 min-h-screen p-2">
           <Accordion.Root type="multiple" defaultValue={["search"]} className="space-y-4">
             {/* Search Section */}
             <Accordion.Item value="search" className="bg-white rounded-lg shadow-sm">
@@ -248,68 +234,15 @@ export default function Home() {
                       <Info className="w-4 h-4 text-gray-400" />
                     </div>
                     <div className="relative">
-                                              <Select.Root value={selectedDrug} onValueChange={setSelectedDrug}>
-                          <Select.Trigger className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white flex items-center justify-between">
-                            <Select.Value placeholder="Select a drug" />
-                            <Select.Icon className="text-gray-400">
-                              <ChevronDownIcon className="w-4 h-4" />
-                            </Select.Icon>
-                          </Select.Trigger>
-                          
-                          <Select.Portal>
-                            <Select.Content className="bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-hidden">
-                              <Select.Viewport className="p-1">
-                                {/* Search Input */}
-                                <div className="p-2 border-b border-gray-200">
-                                  <input
-                                    type="text"
-                                    placeholder="Search drugs..."
-                                    value={drugSearchTerm}
-                                    onChange={(e) => setDrugSearchTerm(e.target.value)}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                </div>
-                                
-                                <Select.Item value=" " className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded cursor-pointer">
-                                  <Select.ItemText>Select</Select.ItemText>
-                                </Select.Item>
-                                
-                                {displayedDrugs.map((item) => (
-                                  <Select.Item 
-                                    key={item} 
-                                    value={item} 
-                                    className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded cursor-pointer"
-                                  >
-                                    <Select.ItemText>{item}</Select.ItemText>
-                                  </Select.Item>
-                                ))}
-                                
-                                {/* Load More Button */}
-                                {filteredDrugs.length > drugDisplayCount && (
-                                  <div className="p-2 border-t border-gray-200">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDrugDisplayCount(prev => Math.min(prev + 50, filteredDrugs.length));
-                                      }}
-                                      className="w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                    >
-                                      Load {Math.min(50, filteredDrugs.length - drugDisplayCount)} more...
-                                    </button>
-                                    </div>
-                                )}
-                                
-                                {/* Results Count */}
-                                {drugSearchTerm && (
-                                  <div className="px-3 py-2 text-xs text-gray-500 text-center border-t border-gray-100">
-                                    {filteredDrugs.length} of {drugList.length} drugs found
-                                  </div>
-                                )}
-                              </Select.Viewport>
-                            </Select.Content>
-                          </Select.Portal>
-                        </Select.Root>
+                        <VirtualizedSelect
+                          value={selectedDrug}
+                          onValueChange={setSelectedDrug}
+                          placeholder="Select a drug"
+                          options={drugList.map(drug => ({ value: drug, label: drug }))}
+                          searchPlaceholder="Search drugs..."
+                          maxHeight={300}
+                          itemHeight={40}
+                        />
                       
                       {selectedDrug && (
                         <button
@@ -335,82 +268,19 @@ export default function Home() {
                         <Info className="w-4 h-4 text-gray-400" />
                       </div>
                       <div className="relative">
-                        <div className="relative">
-                          <button
-                            onClick={() => setDiseaseDropdownOpen(!diseaseDropdownOpen)}
-                            className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white flex items-center justify-between"
-                          >
-                            <span className={selectedDisease ? "text-gray-900" : "text-gray-500"}>
-                              {selectedDisease || "Select a disease"}
-                            </span>
-                            <ChevronDownIcon className="w-4 h-4 text-gray-400" />
-                          </button>
-                          
-                          {diseaseDropdownOpen && (
-                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                              {/* Search Input */}
-                              <div className="p-2 border-b border-gray-200 sticky top-0 bg-white">
-                                <input
-                                  type="text"
-                                  placeholder="Search diseases..."
-                                  value={diseaseSearchTerm}
-                                  onChange={(e) => setDiseaseSearchTerm(e.target.value)}
-                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                              </div>
-                              
-                              {/* Select Option */}
-                              <div 
-                                className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer"
-                                onClick={() => {
-                                  setSelectedDisease("");
-                                  setDiseaseDropdownOpen(false);
-                                }}
-                              >
-                                Select
-                              </div>
-                              
-                              {/* Disease Options */}
-                              {displayedDiseases.map((item, index) => (
-                                <div 
-                                  key={`${item.TERM}-${index}`}
-                                  className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer"
-                                  onClick={() => {
-                                    setSelectedDisease(item.TERM);
-                                    setDiseaseDropdownOpen(false);
-                                  }}
-                                >
-                                  <div className="max-w-[300px] flex flex-col">
-                                    <div className="font-bold text-sm truncate" title={item.TERM}>{item.TERM}</div>
-                                    <div className="text-gray-500 text-xs truncate mt-1" title={item.des}>{item.des}</div>
-                                  </div>
-                                </div>
-                              ))}
-                              
-                              {/* Load More Button */}
-                              {filteredDiseases.length > diseaseDisplayCount && (
-                                <div className="p-2 border-t border-gray-200">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDiseaseDisplayCount(prev => Math.min(prev + 50, filteredDiseases.length));
-                                    }}
-                                    className="w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                  >
-                                    Load {Math.min(50, filteredDiseases.length - diseaseDisplayCount)} more...
-                                  </button>
-                                </div>
-                              )}
-                              
-                              {/* Results Count */}
-                              {diseaseSearchTerm && (
-                                <div className="px-3 py-2 text-xs text-gray-500 text-center border-t border-gray-100">
-                                  {filteredDiseases.length} of {diseaseList.length} diseases found
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        <VirtualizedSelect
+                          value={selectedDisease}
+                          onValueChange={setSelectedDisease}
+                          placeholder="Select a disease"
+                          options={diseaseList.map(disease => ({ 
+                            value: disease.TERM, 
+                            label: disease.TERM, 
+                            description: disease.des 
+                          }))}
+                          searchPlaceholder="Search diseases..."
+                          maxHeight={300}
+                          itemHeight={50}
+                        />
                         
                         {selectedDisease && (
                           <button
@@ -471,7 +341,7 @@ export default function Home() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 bg-white p-8">
+        <div className="flex-1 bg-white p-10">
           {/* Tabs */}
           <div className="border-b border-gray-200 mb-8">
             <nav className="-mb-px flex space-x-8">
@@ -491,7 +361,7 @@ export default function Home() {
 
           {/* Metric Cards */}
           <div className="grid grid-cols-3 gap-6 mb-8">
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-2xl">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-4xl font-bold text-blue-600">{overallStudyType.pk.count}</p>
@@ -501,7 +371,7 @@ export default function Home() {
               </div>
             </div>
             
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-2xl">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-4xl font-bold text-blue-600">{overallStudyType.pe.count}</p>
@@ -511,7 +381,7 @@ export default function Home() {
               </div>
             </div>
             
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-2xl">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-4xl font-bold text-blue-600">{overallStudyType.ct.count}</p>
