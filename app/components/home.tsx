@@ -10,6 +10,7 @@ import VirtualizedSelect from './VirtualizedSelect';
 
 import { getConcepts, getDiseaseList, getDrugList, getExtraData, getOverallStudyType, getPMIDs, getStudy, getTypePopulation, postTest } from "../dataprovider/dataaccessor";
 import { SearchType } from '../libs/database/types';
+import { calculateSummaryStats, preparePlotData, preparePopulationData } from '../libs/dataprocessor/utils';
 
 // Dynamically import Plotly to prevent SSR issues
 const Plot = dynamic(() => import('react-plotly.js'), { 
@@ -51,6 +52,19 @@ export default function Home() {
       description: "Controlled studies evaluating the safety and efficacy of drugs in human subjects"
     }
   });
+  const [populationData, setPopulationData] = useState<any[]>([
+    { name: 'Pediatric', pk: 270204, pe: 630043, ct: 139298, color: '#fbbf24' },
+    { name: 'Fetus', pk: 37109, pe: 60054, ct: 9072, color: '#60a5fa' },
+    { name: 'Premature', pk: 7716, pe: 15098, ct: 0, color: '#60a5fa' },
+    { name: 'Newborn', pk: 62531, pe: 130494, ct: 28553, color: '#60a5fa' },
+    { name: 'Neonate', pk: 29009, pe: 60287, ct: 14235, color: '#60a5fa' },
+    { name: 'Infant', pk: 118132, pe: 269421, ct: 66022, color: '#60a5fa' },
+    { name: 'Child', pk: 184057, pe: 457026, ct: 102569, color: '#60a5fa' },
+    { name: 'Maternal', pk: 136152, pe: 293668, ct: 57541, color: '#fbbf24' },
+    { name: 'Pregnant', pk: 85462, pe: 187872, ct: 34886, color: '#f87171' },
+    { name: 'Labor', pk: 7254, pe: 20170, ct: 7385, color: '#f87171' },
+    { name: 'Postpartum', pk: 8380, pe: 19236, ct: 4338, color: '#f87171' },
+  ]);
 
   useEffect(() => {
     getOverallStudyType().then((overall_study_type: any) => {
@@ -92,43 +106,46 @@ export default function Home() {
       getPMIDs(data, searchType).then((pmidData: any) => {
         // console.log(pmidData);
         getTypePopulation(pmidData).then((typeData: any) => {
+          // console.log("typeData");
           // console.log(typeData);
+          const summaryStats = calculateSummaryStats(typeData);
+          // console.log(summaryStats);
+          // update overallStudyType
+          const newOverallStudyType = {...overallStudyType};
+          newOverallStudyType.pk.count = summaryStats.find(stat => stat.study_type.toLowerCase()==="pk")?.count ?? 0;
+          newOverallStudyType.pe.count = summaryStats.find(stat => stat.study_type.toLowerCase()==="pe")?.count ?? 0;
+          newOverallStudyType.ct.count = summaryStats.find(stat => stat.study_type.toLowerCase()==="ct")?.count ?? 0;
+          setOverallStudyType(newOverallStudyType);
+
+          const pkPlotData = preparePlotData("PK", typeData);
+          const pePlotData = preparePlotData("PE", typeData);
+          const ctPlotData = preparePlotData("CT", typeData);
+        
+          const thePopulationData = preparePopulationData(pkPlotData, pePlotData, ctPlotData);
+
+          setPopulationData(thePopulationData);
         });
         getStudy(pmidData).then((studyData: any) => {
+          console.log("studyData");
           console.log(studyData);
         });
       });
     });
   }
 
-  
-  const populationData = [
-    { name: 'Pediatric', pk: 270204, pharm: 630043, clinical: 139298, color: '#fbbf24' },
-    { name: 'Fetus', pk: 37109, pharm: 60054, clinical: 9072, color: '#60a5fa' },
-    { name: 'Premature', pk: 7716, pharm: 15098, clinical: 0, color: '#60a5fa' },
-    { name: 'Newborn', pk: 62531, pharm: 130494, clinical: 28553, color: '#60a5fa' },
-    { name: 'Neonate', pk: 29009, pharm: 60287, clinical: 14235, color: '#60a5fa' },
-    { name: 'Infant', pk: 118132, pharm: 269421, clinical: 66022, color: '#60a5fa' },
-    { name: 'Child', pk: 184057, pharm: 457026, clinical: 102569, color: '#60a5fa' },
-    { name: 'Maternal', pk: 136152, pharm: 293668, clinical: 57541, color: '#fbbf24' },
-    { name: 'Pregnant', pk: 85462, pharm: 187872, clinical: 34886, color: '#f87171' },
-    { name: 'Labor', pk: 7254, pharm: 20170, clinical: 7385, color: '#f87171' },
-    { name: 'Postpartum', pk: 8380, pharm: 19236, clinical: 4338, color: '#f87171' },
-  ];
-
   // Filter out Premature for Clinical Trial chart as it has 0 value
-  const clinicalData = populationData.filter(item => item.clinical > 0);
+  const clinicalData = populationData.filter(item => item.ct > 0);
 
   // Chart configurations
   const chartLayout = {
-    margin: { l: 30, r: 20, t: 10, b: 80 },
+    margin: { l: 30, r: 20, t: 10, b: 60 },
     showlegend: false,
     plot_bgcolor: 'rgba(0,0,0,0)',
     paper_bgcolor: 'rgba(0,0,0,0)',
     font: { size: 14 },
     xaxis: {
       tickangle: -45,
-      tickfont: { size: 10 },
+      tickfont: { size: 12 },
       title: { text: 'Population', font: { size: 12 } }
     },
     yaxis: {
@@ -153,26 +170,26 @@ export default function Home() {
 
   const pharmChartData = [{
     x: populationData.map(d => d.name),
-    y: populationData.map(d => d.pharm),
+    y: populationData.map(d => d.pe),
     type: 'bar' as const,
     marker: {
       color: populationData.map(d => d.color),
       line: { width: 1, color: '#374151' }
     },
-    text: populationData.map(d => d.pharm.toString()),
+    text: populationData.map(d => d.pe.toString()),
     textposition: 'outside' as const,
     textfont: { size: 16 }
   }];
 
   const clinicalChartData = [{
     x: clinicalData.map(d => d.name),
-    y: clinicalData.map(d => d.clinical),
+    y: clinicalData.map(d => d.ct),
     type: 'bar' as const,
     marker: {
       color: clinicalData.map(d => d.color),
       line: { width: 1, color: '#374151' }
     },
-    text: clinicalData.map(d => d.clinical.toString()),
+    text: clinicalData.map(d => d.ct.toString()),
     textposition: 'outside' as const,
     textfont: { size: 16 }
   }];
@@ -464,7 +481,7 @@ export default function Home() {
                   yaxis: { ...chartLayout.yaxis }
                 }}
                 config={{ displayModeBar: false }}
-                style={{ width: '100%', height: '300px' }}
+                style={{ width: '100%', height: '350px' }}
               />
             </div>
 
@@ -478,7 +495,7 @@ export default function Home() {
                   yaxis: { ...chartLayout.yaxis }
                 }}
                 config={{ displayModeBar: false }}
-                style={{ width: '100%', height: '300px' }}
+                style={{ width: '100%', height: '350px' }}
               />
             </div>
 
@@ -503,7 +520,7 @@ export default function Home() {
                   yaxis: { ...chartLayout.yaxis }
                 }}
                 config={{ displayModeBar: false }}
-                style={{ width: '100%', height: '300px' }}
+                style={{ width: '100%', height: '350px' }}
               />
             </div>
           </div>
@@ -512,3 +529,4 @@ export default function Home() {
     </div>
   );
 } 
+

@@ -193,7 +193,7 @@ export async function queriedPMIDMySql(
       WHERE d.cui  IN (${placeholders(drugCuis.length)})
         AND dis.cui IN (${placeholders(diseaseCuis.length)})
     `;
-    const [rows] = await pool.execute(sql, [drugCuis, diseaseCuis]);
+    const [rows] = await pool.execute(sql, [...drugCuis, ...diseaseCuis]);
     return (rows as any[]).map(r => ({ pmid: String(r.pmid) }));
   }
 
