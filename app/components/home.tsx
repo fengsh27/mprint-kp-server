@@ -8,7 +8,8 @@ import * as Accordion from '@radix-ui/react-accordion';
 import * as Select from '@radix-ui/react-select';
 import VirtualizedSelect from './VirtualizedSelect';
 
-import { getDiseaseList, getDrugList, getOverallStudyType, postTest } from "../dataprovider/dataaccessor";
+import { getConcepts, getDiseaseList, getDrugList, getExtraData, getOverallStudyType, getPMIDs, getStudy, getTypePopulation, postTest } from "../dataprovider/dataaccessor";
+import { SearchType } from '../libs/database/types';
 
 // Dynamically import Plotly to prevent SSR issues
 const Plot = dynamic(() => import('react-plotly.js'), { 
@@ -58,7 +59,7 @@ export default function Home() {
     getDrugList().then((data: any) => {
       const drugs = (data.druglist as Array<{name: string, type: string}>).filter(
         (item) => item.type == "drug"
-      ).map(item => item.name).sort();
+      ).map(item => item.name);
       setDrugList(drugs);
     });
     // postTest();
@@ -67,14 +68,38 @@ export default function Home() {
   useEffect(() => {
     if (searchMode === 'advanced' && diseaseList.length === 0) {
       getDiseaseList().then((data: any) => {
-        const diseases = (data.disease as Array<{TERM: string, des: string}>).sort(
-          (a, b) => a.TERM.localeCompare(b.TERM)
-        );
+        const diseases = (data.disease as Array<{TERM: string, des: string}>);
         setDiseaseList(diseases);
     });
     }
   }, [searchMode]);
 
+  function handleSearch() {
+    getConcepts(selectedDrug, selectedDisease).then((data: any) => {
+      if (!data || data.length === 0) {
+        return;
+      }
+      getExtraData(data, "atc").then((atcData: any) => {
+        console.log(atcData);
+      });
+      const searchType: SearchType = [];
+      if (selectedDrug) {
+        searchType.push("Drug");
+      }
+      if (selectedDisease) {
+        searchType.push("Disease");
+      }
+      getPMIDs(data, searchType).then((pmidData: any) => {
+        // console.log(pmidData);
+        getTypePopulation(pmidData).then((typeData: any) => {
+          // console.log(typeData);
+        });
+        getStudy(pmidData).then((studyData: any) => {
+          console.log(studyData);
+        });
+      });
+    });
+  }
 
   
   const populationData = [
@@ -95,12 +120,12 @@ export default function Home() {
   const clinicalData = populationData.filter(item => item.clinical > 0);
 
   // Chart configurations
-      const chartLayout = {
-      margin: { l: 30, r: 20, t: 10, b: 80 },
-      showlegend: false,
-      plot_bgcolor: 'rgba(0,0,0,0)',
-      paper_bgcolor: 'rgba(0,0,0,0)',
-      font: { size: 14 },
+  const chartLayout = {
+    margin: { l: 30, r: 20, t: 10, b: 80 },
+    showlegend: false,
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    font: { size: 14 },
     xaxis: {
       tickangle: -45,
       tickfont: { size: 10 },
@@ -183,7 +208,7 @@ export default function Home() {
 
       <div className="flex">
         {/* Left Sidebar */}
-        <div className={`${sidebarExpanded ? 'w-64' : 'w-16'} bg-gray-100 min-h-screen transition-all duration-300 ease-in-out relative`}>
+        <div className={`${sidebarExpanded ? 'w-64' : 'w-16'} bg-gray-100 min-h-screen transition-all duration-300 ease-in-out relative overflow-visible`}>
           {/* Toggle Button */}
           <button
             onClick={() => setSidebarExpanded(!sidebarExpanded)}
@@ -201,7 +226,7 @@ export default function Home() {
             )}
           </button>
           
-          <div className={`${sidebarExpanded ? 'p-2' : 'p-1'} overflow-hidden mt-8`}>
+          <div className={`${sidebarExpanded ? 'p-2' : 'p-1'} mt-8`}>
           {sidebarExpanded ? (
             <Accordion.Root type="multiple" defaultValue={["search"]} className="space-y-4">
               {/* Search Section */}
@@ -317,7 +342,10 @@ export default function Home() {
                     </div>
                   )}
                   
-                  <button className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                  <button 
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                    onClick={handleSearch}
+                  >
                     Search
                   </button>
                 </div>

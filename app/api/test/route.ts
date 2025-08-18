@@ -10,7 +10,6 @@ export async function GET() {
 } 
 
 export async function POST(request: Request) {
-  const druglist = (data as any).druglist as Array<any>;
-  console.log(druglist);
+  
   return NextResponse.json({ message: "POST request received", timestamp: new Date().toISOString() });
 }
