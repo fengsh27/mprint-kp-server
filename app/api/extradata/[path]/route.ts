@@ -12,10 +12,10 @@ import type { ConceptRow, RowDict } from "../../../libs/database/types";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { path: string } }
+  { params }: { params: Promise<{ path: string }> }
 ) {
   const conceptIds = (await req.json()) as ConceptRow[];
-  const { path } = params;
+  const { path } = await params;
 
   let rows: RowDict[] = [];
 
