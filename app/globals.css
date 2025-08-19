@@ -17,3 +17,20 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Responsive chart styles */
+.js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.js-plotly-plot .plotly {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Ensure charts are responsive */
+.plot-container {
+  width: 100% !important;
+  height: 100% !important;
+}

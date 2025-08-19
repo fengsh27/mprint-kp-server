@@ -1,22 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Download, BarChart3, Edit, User, Plus, Info, ChevronDownIcon } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { Search, Download, BarChart3, Info, ChevronDownIcon } from 'lucide-react';
 import Image from 'next/image';
 import * as Accordion from '@radix-ui/react-accordion';
-import * as Select from '@radix-ui/react-select';
+import * as Tabs from '@radix-ui/react-tabs';
 import VirtualizedSelect from './VirtualizedSelect';
+import OverviewTab from './OverviewTab';
+import DrugTab from './DrugTab';
 
 import { getConcepts, getDiseaseList, getDrugList, getExtraData, getOverallStudyType, getPMIDs, getStudy, getTypePopulation, postTest } from "../dataprovider/dataaccessor";
-import { SearchType } from '../libs/database/types';
+import { ConceptRow, SearchType } from '../libs/database/types';
 import { calculateSummaryStats, preparePlotData, preparePopulationData } from '../libs/dataprocessor/utils';
 
-// Dynamically import Plotly to prevent SSR issues
-const Plot = dynamic(() => import('react-plotly.js'), { 
-  ssr: false,
-  loading: () => <div className="w-full h-[300px] bg-gray-100 animate-pulse rounded"></div>
-});
+
 
 const DEFAULT_LOGO_WIDTH = 150;
 const DEFAULT_LOGO_HEIGHT = 182;
@@ -34,6 +31,8 @@ export default function Home() {
   const [selectedDisease, setSelectedDisease] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [hasDrugSearched, setHasDrugSearched] = useState(false);
+  const [isTabSwitching, setIsTabSwitching] = useState(false);
 
   const [overallStudyType, setOverallStudyType] = useState({
     pk: {
@@ -66,6 +65,20 @@ export default function Home() {
     { name: 'Postpartum', pk: 8380, pe: 19236, ct: 4338, color: '#f87171' },
   ]);
 
+  // Chart data and layout
+  const [pkChartData, setPkChartData] = useState<any[]>([]);
+  const [pharmChartData, setPharmChartData] = useState<any[]>([]);
+  const [clinicalChartData, setClinicalChartData] = useState<any[]>([]);
+  const [chartLayout, setChartLayout] = useState<any>({
+    margin: { l: 50, r: 50, t: 50, b: 50 },
+    yaxis: { 
+      showticklabels: false,
+      tickmode: 'array',
+      tickvals: [],
+      ticktext: []
+    }
+  });
+
   useEffect(() => {
     getOverallStudyType().then((overall_study_type: any) => {
       setOverallStudyType(overall_study_type);
@@ -88,12 +101,108 @@ export default function Home() {
     }
   }, [searchMode]);
 
+  // Handle window resize for responsive charts
+  useEffect(() => {
+    const handleResize = () => {
+      // Trigger Plotly resize event
+      if (typeof window !== 'undefined' && (window as any).Plotly) {
+        const plotElements = document.querySelectorAll('.js-plotly-plot');
+        plotElements.forEach((element) => {
+          (window as any).Plotly.Plots.resize(element);
+        });
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Generate chart data when population data changes
+  useEffect(() => {
+    const clinicalData = populationData.filter(item => item.ct > 0);
+    
+    const newChartLayout = {
+      margin: { l: 30, r: 20, t: 10, b: 60 },
+      showlegend: false,
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      font: { size: 14 },
+      xaxis: {
+        tickangle: -45,
+        tickfont: { size: 12 },
+        title: { text: 'Population', font: { size: 12 } }
+      },
+      yaxis: {
+        tickfont: { size: 10 },
+        title: { text: '', font: { size: 12 } },
+        showticklabels: true
+      }
+    };
+
+    const newPkChartData = [{
+      x: populationData.map(d => d.name),
+      y: populationData.map(d => d.pk),
+      type: 'bar' as const,
+      marker: {
+        color: populationData.map(d => d.color),
+        line: { width: 1, color: '#374151' }
+      },
+      text: populationData.map(d => d.pk.toString()),
+      textposition: 'outside' as const,
+      textfont: { size: 16 }
+    }];
+
+    const newPharmChartData = [{
+      x: populationData.map(d => d.name),
+      y: populationData.map(d => d.pe),
+      type: 'bar' as const,
+      marker: {
+        color: populationData.map(d => d.color),
+        line: { width: 1, color: '#374151' }
+      },
+      text: populationData.map(d => d.pe.toString()),
+      textposition: 'outside' as const,
+      textfont: { size: 16 }
+    }];
+
+    const newClinicalChartData = [{
+      x: clinicalData.map(d => d.name),
+      y: clinicalData.map(d => d.ct),
+      type: 'bar' as const,
+      marker: {
+        color: clinicalData.map(d => d.color),
+        line: { width: 1, color: '#374151' }
+      },
+      text: clinicalData.map(d => d.ct.toString()),
+      textposition: 'outside' as const,
+      textfont: { size: 16 }
+    }];
+
+    setChartLayout(newChartLayout);
+    setPkChartData(newPkChartData);
+    setPharmChartData(newPharmChartData);
+    setClinicalChartData(newClinicalChartData);
+  }, [populationData]);
+
+  function handleTabChange(value: string) {
+    setIsTabSwitching(true);
+    setActiveTab(value);
+    // Small delay to show loading state
+    setTimeout(() => setIsTabSwitching(false), 150);
+  }
+
   function handleSearch() {
     getConcepts(selectedDrug, selectedDisease).then((data: any) => {
       if (!data || data.length === 0) {
         return;
       }
+      const concepts: ConceptRow[] = data as ConceptRow[];
+      const drugConcept = concepts.some(concept => concept.type === "drug");
+      setHasDrugSearched(drugConcept);
+      console.log("data");
+      console.log(data);
       getExtraData(data, "atc").then((atcData: any) => {
+        console.log("atcData");
         console.log(atcData);
       });
       const searchType: SearchType = [];
@@ -133,66 +242,11 @@ export default function Home() {
     });
   }
 
-  // Filter out Premature for Clinical Trial chart as it has 0 value
-  const clinicalData = populationData.filter(item => item.ct > 0);
 
-  // Chart configurations
-  const chartLayout = {
-    margin: { l: 30, r: 20, t: 10, b: 60 },
-    showlegend: false,
-    plot_bgcolor: 'rgba(0,0,0,0)',
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    font: { size: 14 },
-    xaxis: {
-      tickangle: -45,
-      tickfont: { size: 12 },
-      title: { text: 'Population', font: { size: 12 } }
-    },
-    yaxis: {
-      tickfont: { size: 10 },
-      title: { text: '', font: { size: 12 } },
-      showticklabels: true
-    }
-  };
 
-  const pkChartData = [{
-    x: populationData.map(d => d.name),
-    y: populationData.map(d => d.pk),
-    type: 'bar' as const,
-    marker: {
-      color: populationData.map(d => d.color),
-      line: { width: 1, color: '#374151' }
-    },
-    text: populationData.map(d => d.pk.toString()),
-    textposition: 'outside' as const,
-    textfont: { size: 16 }
-  }];
 
-  const pharmChartData = [{
-    x: populationData.map(d => d.name),
-    y: populationData.map(d => d.pe),
-    type: 'bar' as const,
-    marker: {
-      color: populationData.map(d => d.color),
-      line: { width: 1, color: '#374151' }
-    },
-    text: populationData.map(d => d.pe.toString()),
-    textposition: 'outside' as const,
-    textfont: { size: 16 }
-  }];
 
-  const clinicalChartData = [{
-    x: clinicalData.map(d => d.name),
-    y: clinicalData.map(d => d.ct),
-    type: 'bar' as const,
-    marker: {
-      color: clinicalData.map(d => d.color),
-      line: { width: 1, color: '#374151' }
-    },
-    text: clinicalData.map(d => d.ct.toString()),
-    textposition: 'outside' as const,
-    textfont: { size: 16 }
-  }];
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -417,113 +471,72 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Main Content */}
+                {/* Main Content */}
         <div className="flex-1 bg-white p-10">
           {/* Tabs */}
-          <div className="border-b border-gray-200 mb-8">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-                  activeTab === 'overview'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+          <Tabs.Root 
+            value={activeTab} 
+            onValueChange={handleTabChange}
+            className="w-full"
+            defaultValue="overview"
+          >
+            <Tabs.List 
+              className="flex border-b border-gray-200 mb-8" 
+              aria-label="Dashboard navigation tabs"
+            >
+              <Tabs.Trigger
+                value="overview"
+                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               >
                 <BarChart3 className="w-4 h-4" />
                 <span>Overview</span>
-              </button>
-            </nav>
-          </div>
+              </Tabs.Trigger>
+              
+              {hasDrugSearched && (
+                <Tabs.Trigger
+                  value="drug"
+                  className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Drug</span>
+                </Tabs.Trigger>
+              )}
+            </Tabs.List>
 
-          {/* Metric Cards */}
-          <div className="grid grid-cols-3 gap-6 mb-8">
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-4xl font-bold text-blue-600">{overallStudyType.pk.count}</p>
-                  <p className="text-gray-600 mt-1">Pharmacokinetics</p>
+            <Tabs.Content 
+              value="overview" 
+              className="outline-none animate-in fade-in-0 slide-in-from-left-1 duration-300"
+            >
+              {isTabSwitching && activeTab !== 'overview' ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
-                <Edit className="w-5 h-5 text-blue-600" />
-              </div>
-            </div>
+              ) : (
+                <OverviewTab
+                  overallStudyType={overallStudyType}
+                  pkChartData={pkChartData}
+                  pharmChartData={pharmChartData}
+                  clinicalChartData={clinicalChartData}
+                  chartLayout={chartLayout}
+                />
+              )}
+            </Tabs.Content>
             
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-4xl font-bold text-blue-600">{overallStudyType.pe.count}</p>
-                  <p className="text-gray-600 mt-1">Pharmacoepidemiology</p>
-                </div>
-                <Edit className="w-5 h-5 text-blue-600" />
-              </div>
-            </div>
-            
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-4xl font-bold text-blue-600">{overallStudyType.ct.count}</p>
-                  <p className="text-gray-600 mt-1">Clinical Trial</p>
-                </div>
-                <User className="w-5 h-5 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* Charts */}
-          <div className="grid grid-cols-3 gap-6">
-            {/* PK Study Chart */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">PK study by population</h3>
-              <Plot
-                data={pkChartData}
-                layout={{
-                  ...chartLayout,
-                  yaxis: { ...chartLayout.yaxis }
-                }}
-                config={{ displayModeBar: false }}
-                style={{ width: '100%', height: '350px' }}
-              />
-            </div>
-
-            {/* Pharmacoepidemiology Chart */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Pharmacoepidemiology study by population</h3>
-              <Plot
-                data={pharmChartData}
-                layout={{
-                  ...chartLayout,
-                  yaxis: { ...chartLayout.yaxis }
-                }}
-                config={{ displayModeBar: false }}
-                style={{ width: '100%', height: '350px' }}
-              />
-            </div>
-
-            {/* Clinical Trial Chart */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Clinical trial by population</h3>
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-white border border-gray-300 rounded flex items-center justify-center">
-                    <Plus className="w-3 h-3 text-gray-600" />
+            {hasDrugSearched && (
+              <Tabs.Content 
+                value="drug" 
+                className="outline-none animate-in fade-in-0 slide-in-from-right-1 duration-300"
+              >
+                {isTabSwitching && activeTab !== 'drug' ? (
+                  <div className="flex items-center justify-center h-32">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
-                  <div className="w-4 h-4 bg-white border border-gray-300 rounded"></div>
-                  <div className="w-6 h-6 bg-pink-400 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                    CA
-                  </div>
-                </div>
-              </div>
-              <Plot
-                data={clinicalChartData}
-                layout={{
-                  ...chartLayout,
-                  yaxis: { ...chartLayout.yaxis }
-                }}
-                config={{ displayModeBar: false }}
-                style={{ width: '100%', height: '350px' }}
-              />
-            </div>
-          </div>
+                ) : (
+                  <DrugTab selectedDrug={selectedDrug} />
+                )}
+              </Tabs.Content>
+            )}
+          </Tabs.Root>
         </div>
       </div>
     </div>
