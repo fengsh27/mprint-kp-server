@@ -9,7 +9,17 @@ import VirtualizedSelect from './VirtualizedSelect';
 import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
 
-import { getConcepts, getDiseaseList, getDrugList, getExtraData, getOverallStudyType, getPMIDs, getStudy, getTypePopulation, postTest } from "../dataprovider/dataaccessor";
+import { 
+  daGetConcepts, 
+  daGetDiseaseList, 
+  daGetDrugList, 
+  daGetExtraData, 
+  daGetOverallStudyType, 
+  daGetPMIDs, 
+  daGetStudy, 
+  daGetTypePopulation, 
+  postTest 
+} from "../dataprovider/dataaccessor";
 import { ConceptRow, SearchType } from '../libs/database/types';
 import { calculateSummaryStats, preparePlotData, preparePopulationData } from '../libs/dataprocessor/utils';
 
@@ -80,10 +90,10 @@ export default function Home() {
   });
 
   useEffect(() => {
-    getOverallStudyType().then((overall_study_type: any) => {
+    daGetOverallStudyType().then((overall_study_type: any) => {
       setOverallStudyType(overall_study_type);
     });
-    getDrugList().then((data: any) => {
+    daGetDrugList().then((data: any) => {
       const drugs = (data.druglist as Array<{name: string, type: string}>).filter(
         (item) => item.type == "drug"
       ).map(item => item.name);
@@ -94,7 +104,7 @@ export default function Home() {
 
   useEffect(() => {
     if (searchMode === 'advanced' && diseaseList.length === 0) {
-      getDiseaseList().then((data: any) => {
+      daGetDiseaseList().then((data: any) => {
         const diseases = (data.disease as Array<{TERM: string, des: string}>);
         setDiseaseList(diseases);
     });
@@ -192,7 +202,7 @@ export default function Home() {
   }
 
   function handleSearch() {
-    getConcepts(selectedDrug, selectedDisease).then((data: any) => {
+    daGetConcepts(selectedDrug, selectedDisease).then((data: any) => {
       if (!data || data.length === 0) {
         return;
       }
@@ -201,7 +211,7 @@ export default function Home() {
       setHasDrugSearched(drugConcept);
       console.log("data");
       console.log(data);
-      getExtraData(data, "atc").then((atcData: any) => {
+      daGetExtraData(data, "atc").then((atcData: any) => {
         console.log("atcData");
         console.log(atcData);
       });
@@ -212,9 +222,9 @@ export default function Home() {
       if (selectedDisease) {
         searchType.push("Disease");
       }
-      getPMIDs(data, searchType).then((pmidData: any) => {
+      daGetPMIDs(data, searchType).then((pmidData: any) => {
         // console.log(pmidData);
-        getTypePopulation(pmidData).then((typeData: any) => {
+        daGetTypePopulation(pmidData).then((typeData: any) => {
           // console.log("typeData");
           // console.log(typeData);
           const summaryStats = calculateSummaryStats(typeData);
@@ -234,19 +244,13 @@ export default function Home() {
 
           setPopulationData(thePopulationData);
         });
-        getStudy(pmidData).then((studyData: any) => {
+        daGetStudy(pmidData).then((studyData: any) => {
           console.log("studyData");
           console.log(studyData);
         });
       });
     });
   }
-
-
-
-
-
-
 
   return (
     <div className="min-h-screen bg-gray-50">
