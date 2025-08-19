@@ -74,6 +74,7 @@ export default function Home() {
     { name: 'Labor', pk: 7254, pe: 20170, ct: 7385, color: '#f87171' },
     { name: 'Postpartum', pk: 8380, pe: 19236, ct: 4338, color: '#f87171' },
   ]);
+  const [concepts, setConcepts] = useState<ConceptRow[]>([]);
 
   // Chart data and layout
   const [pkChartData, setPkChartData] = useState<any[]>([]);
@@ -107,7 +108,7 @@ export default function Home() {
       daGetDiseaseList().then((data: any) => {
         const diseases = (data.disease as Array<{TERM: string, des: string}>);
         setDiseaseList(diseases);
-    });
+      });
     }
   }, [searchMode]);
 
@@ -207,14 +208,15 @@ export default function Home() {
         return;
       }
       const concepts: ConceptRow[] = data as ConceptRow[];
-      const drugConcept = concepts.some(concept => concept.type === "drug");
-      setHasDrugSearched(drugConcept);
+      const isDrugConceptQueried = concepts.some(concept => concept.type === "drug");
+      setHasDrugSearched(isDrugConceptQueried);
       console.log("data");
       console.log(data);
-      daGetExtraData(data, "atc").then((atcData: any) => {
-        console.log("atcData");
-        console.log(atcData);
-      });
+      setConcepts(data);
+      // daGetExtraData(data, "atc").then((atcData: any) => {
+      //   console.log("atcData");
+      //   console.log(atcData);
+      // });
       const searchType: SearchType = [];
       if (selectedDrug) {
         searchType.push("Drug");
@@ -536,7 +538,7 @@ export default function Home() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
                 ) : (
-                  <DrugTab selectedDrug={selectedDrug} />
+                  <DrugTab selectedDrug={selectedDrug} concepts={concepts} />
                 )}
               </Tabs.Content>
             )}

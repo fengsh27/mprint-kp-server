@@ -31,5 +31,38 @@ export type StudyResult = {
   StudiedDiseases: string;
 };
 
+export type ATCData = {
+  cui: string;
+  L1: string;
+  L2: string;
+  L3: string;
+  L4: string;
+  atc_code: string;
+};
+
+export type MOAData = {
+  CUI: string;
+  MOA: string;
+  type: string;
+};
+
+export type PEData = {
+  CUI: string;
+  PE: string;
+  type: string;
+};
+
+export type EPCData = {
+  CUI: string;
+  EPC: string;
+  type: string;
+};
+
+export type PKData = {
+  property: string;
+  value: string;
+  CUI: string;
+}
+
 
 

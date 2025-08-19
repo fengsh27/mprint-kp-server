@@ -32,6 +32,12 @@ export async function POST(
     case "label_stats":
       rows = await queriedLabelsMySql(conceptIds);
       break;
+    case "moa":
+      rows = await queriedMOAMySql(conceptIds);
+      break;
+    case "pe":
+      rows = await queriedPEMySql(conceptIds);
+      break;
     default:
       return NextResponse.json({ error: "Unknown path" }, { status: 404 });
   }

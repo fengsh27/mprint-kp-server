@@ -135,7 +135,8 @@ async function fetch_by_cui_list(
 
 export async function queriedAtcMySql(conceptIds: ConceptRow[]): Promise<RowDict[]> {
   const drugCuis = pick_drug_cuis(conceptIds);
-  return fetch_by_cui_list(pool, "atc", drugCuis, "atcid");
+  const rows = await fetch_by_cui_list(pool, "atc", drugCuis, "atcid");
+  return dedup_rows(rows, r => `${r.L1}:${r.L2}:${r.L3}:${r.L4}:${r.atc_code}`);
 }
 
 export async function queriedEpcMySql(conceptIds: ConceptRow[]): Promise<RowDict[]> {
