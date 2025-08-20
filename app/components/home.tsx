@@ -203,6 +203,7 @@ export default function Home() {
   }
 
   function handleSearch() {
+    handleTabChange("overview");
     daGetConcepts(selectedDrug, selectedDisease).then((data: any) => {
       if (!data || data.length === 0) {
         return;
@@ -210,9 +211,7 @@ export default function Home() {
       const concepts: ConceptRow[] = data as ConceptRow[];
       const isDrugConceptQueried = concepts.some(concept => concept.type === "drug");
       setHasDrugSearched(isDrugConceptQueried);
-      console.log("data");
-      console.log(data);
-      setConcepts(data);
+      setConcepts(concepts);
       // daGetExtraData(data, "atc").then((atcData: any) => {
       //   console.log("atcData");
       //   console.log(atcData);

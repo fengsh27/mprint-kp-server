@@ -1081,6 +1081,11 @@ clsx@^1.0.4:
   resolved "https://registry.npmjs.org/clsx/-/clsx-1.2.1.tgz"
   integrity sha512-EcR6r5a8bj6pu3ycsa/E/cKVGuTgZJZdsyUYHOksG/UHIiKfjxzRxYJpyVBwYaQeOvghal9fcc4PidlgzugAQg==
 
+clsx@^2.0.0:
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/clsx/-/clsx-2.1.1.tgz#eed397c9fd8bd882bfb18deab7102049a2f32999"
+  integrity sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==
+
 color-alpha@1.0.4, color-alpha@^1.0.4:
   version "1.0.4"
   resolved "https://registry.npmjs.org/color-alpha/-/color-alpha-1.0.4.tgz"
@@ -2553,6 +2558,13 @@ rc-virtual-list@^3.5.1:
     classnames "^2.2.6"
     rc-resize-observer "^1.0.0"
     rc-util "^5.36.0"
+
+react-data-grid@^7.0.0-beta.57:
+  version "7.0.0-beta.57"
+  resolved "https://registry.yarnpkg.com/react-data-grid/-/react-data-grid-7.0.0-beta.57.tgz#6d69bb3edabb9260ed611a9ed424074f226bf7e4"
+  integrity sha512-z0gcCsoXUS3xdOc2TGZZJGHFXImSorNVE9/wNUNUhcpBlH1eG1Fl7vo5ozxwOJrcaXkCj8nbEjmRAwcPJdw6Lg==
+  dependencies:
+    clsx "^2.0.0"
 
 react-dom@19.1.0:
   version "19.1.0"

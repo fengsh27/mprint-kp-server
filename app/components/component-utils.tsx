@@ -1,6 +1,6 @@
 import { Database, Folder, FolderOpen, FileText } from 'lucide-react';
 
-import { ATCData } from "../libs/database/types";
+import { ATCData, LabelStatsData } from "../libs/database/types";
 
 
 export interface RCTreeNode {
@@ -95,4 +95,85 @@ export const getAtcCustomIcon = (props: any) => {
     return <FileText className="w-4 h-4 text-gray-600" />;
   }
 };
+
+export const LabelStatsTableColumns = [{
+  key: "TITLE",
+  name: "TITLE",
+  width: 300,
+  minWidth: 200,
+  maxWidth: 500,
+  resizable: true,
+}, {
+  key: "nursing_mothers",
+  name: "Nursing Mothers",
+  width: 150,
+  minWidth: 100,
+  maxWidth: 200,
+  resizable: true,
+}, {
+  key: "carcinogenesis_and_mutagenesis_and_impairment_of_fertility",
+  name: "Carcinogenesis and Mutagenesis and Impairment of Fertility",
+  width: 200,
+  minWidth: 150,
+  maxWidth: 300,
+  resizable: true,
+}, {
+  key: "pregnancy",
+  name: "Pregnancy",
+  width: 120,
+  minWidth: 100,
+  maxWidth: 180,
+  resizable: true,
+}, {
+  key: "pediatric_use",
+  name: "Pediatric Use",
+  width: 120,
+  minWidth: 100,
+  maxWidth: 180,
+  resizable: true,
+}, {
+  key: "teratogenic_effects",
+  name: "Teratogenic Effects",
+  width: 150,
+  minWidth: 120,
+  maxWidth: 200,
+  resizable: true,
+}, {
+  key: "pregnancy_or_breast_feeding",
+  name: "Pregnancy or Breast Feeding",
+  width: 180,
+  minWidth: 150,
+  maxWidth: 250,
+  resizable: true,
+}, {
+  key: "labor_and_delivery",
+  name: "Labor and Delivery",
+  width: 140,
+  minWidth: 120,
+  maxWidth: 200,
+  resizable: true,
+}, {
+  key: "nonteratogenic_effects",
+  name: "Non-Teratogenic Effects",
+  width: 180,
+  minWidth: 150,
+  maxWidth: 250,
+  resizable: true,
+}]
+
+export const buildLabelStatsTable = (data: LabelStatsData[]) => {
+  return data.map(item => {
+    return {
+      TITLE: item.TITLE,
+      nursing_mothers: item.nursing_mothers === 1 ? "✅️" : "❌️",
+      carcinogenesis_and_mutagenesis_and_impairment_of_fertility: item.carcinogenesis_and_mutagenesis_and_impairment_of_fertility === 1 ? "✅️" : "❌️",
+      pregnancy: item.pregnancy === 1 ? "✅️" : "❌️",
+      pediatric_use: item.pediatric_use === 1 ? "✅️" : "❌️",
+      teratogenic_effects: item.teratogenic_effects === 1 ? "✅️" : "❌️",
+      pregnancy_or_breast_feeding: item.pregnancy_or_breast_feeding === 1 ? "✅️" : "❌️",
+      labor_and_delivery: item.labor_and_delivery === 1 ? "✅️" : "❌️",
+      nonteratogenic_effects: item.nonteratogenic_effects === 1 ? "✅️" : "❌️",
+    }
+  })
+}
 

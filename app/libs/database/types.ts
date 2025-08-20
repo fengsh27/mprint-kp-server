@@ -64,5 +64,17 @@ export type PKData = {
   CUI: string;
 }
 
+export type LabelStatsData = {
+  cui: string;
+  nursing_mothers: number;
+  carcinogenesis_and_mutagenesis_and_impairment_of_fertility: number;
+  pregnancy: number;
+  pediatric_use: number;
+  teratogenic_effects: number;
+  pregnancy_or_breast_feeding: number;
+  labor_and_delivery: number;
+  nonteratogenic_effects: number;
+  TITLE: string;
+}
 
 
