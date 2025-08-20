@@ -8,19 +8,24 @@ import * as Tabs from '@radix-ui/react-tabs';
 import VirtualizedSelect from './VirtualizedSelect';
 import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
+import PublicationTab from './PublicationTab';
+import PKModelsTab from './PKModelsTab';
 
 import { 
   daGetConcepts, 
   daGetDiseaseList, 
   daGetDrugList, 
-  daGetExtraData, 
   daGetOverallStudyType, 
   daGetPMIDs, 
-  daGetStudy, 
   daGetTypePopulation, 
   postTest 
 } from "../dataprovider/dataaccessor";
-import { ConceptRow, SearchType } from '../libs/database/types';
+import { 
+  ConceptRow, 
+  PmidRow, 
+  SearchType, 
+  TypeData 
+} from '../libs/database/types';
 import { calculateSummaryStats, preparePlotData, preparePopulationData } from '../libs/dataprocessor/utils';
 
 
@@ -33,6 +38,74 @@ const logoSize = {
   h: 100 * DEFAULT_LOGO_HEIGHT / DEFAULT_LOGO_WIDTH,
 };
 
+function calculatePlotData(populationData: any[]) {
+  const clinicalData = populationData.filter(item => item.ct > 0);
+    
+    const newChartLayout = {
+      margin: { l: 30, r: 20, t: 10, b: 60 },
+      showlegend: false,
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      font: { size: 14 },
+      xaxis: {
+        tickangle: -45,
+        tickfont: { size: 12 },
+        title: { text: 'Population', font: { size: 12 } }
+      },
+      yaxis: {
+        tickfont: { size: 10 },
+        title: { text: '', font: { size: 12 } },
+        showticklabels: true
+      }
+    };
+
+    const newPkChartData = [{
+      x: populationData.map(d => d.name),
+      y: populationData.map(d => d.pk),
+      type: 'bar' as const,
+      marker: {
+        color: populationData.map(d => d.color),
+        line: { width: 1, color: '#374151' }
+      },
+      text: populationData.map(d => d.pk.toString()),
+      textposition: 'outside' as const,
+      textfont: { size: 16 }
+    }];
+
+  const newPharmChartData = [{
+    x: populationData.map(d => d.name),
+    y: populationData.map(d => d.pe),
+    type: 'bar' as const,
+    marker: {
+      color: populationData.map(d => d.color),
+      line: { width: 1, color: '#374151' }
+    },
+    text: populationData.map(d => d.pe.toString()),
+    textposition: 'outside' as const,
+    textfont: { size: 16 }
+  }];
+
+  const newClinicalChartData = [{
+    x: clinicalData.map(d => d.name),
+    y: clinicalData.map(d => d.ct),
+    type: 'bar' as const,
+    marker: {
+      color: clinicalData.map(d => d.color),
+      line: { width: 1, color: '#374151' }
+    },
+    text: clinicalData.map(d => d.ct.toString()),
+    textposition: 'outside' as const,
+    textfont: { size: 16 }
+  }];
+
+  return {
+    layout: newChartLayout,
+    pkChartData: newPkChartData,
+    pharmChartData: newPharmChartData,
+    clinicalChartData: newClinicalChartData
+  };
+}
+
 export default function Home() {
   const [searchMode, setSearchMode] = useState('simple');
   const [drugList, setDrugList] = useState<string[]>([]);
@@ -43,6 +116,8 @@ export default function Home() {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [hasDrugSearched, setHasDrugSearched] = useState(false);
   const [isTabSwitching, setIsTabSwitching] = useState(false);
+  const [pmidData, setPmidData] = useState<PmidRow[]>([]);
+  const [typeData, setTypeData] = useState<TypeData[]>([]);
 
   const [overallStudyType, setOverallStudyType] = useState({
     pk: {
@@ -75,7 +150,7 @@ export default function Home() {
     { name: 'Postpartum', pk: 8380, pe: 19236, ct: 4338, color: '#f87171' },
   ]);
   const [concepts, setConcepts] = useState<ConceptRow[]>([]);
-
+  
   // Chart data and layout
   const [pkChartData, setPkChartData] = useState<any[]>([]);
   const [pharmChartData, setPharmChartData] = useState<any[]>([]);
@@ -130,69 +205,12 @@ export default function Home() {
 
   // Generate chart data when population data changes
   useEffect(() => {
-    const clinicalData = populationData.filter(item => item.ct > 0);
+    const {layout, pkChartData, pharmChartData, clinicalChartData} = calculatePlotData(populationData);
     
-    const newChartLayout = {
-      margin: { l: 30, r: 20, t: 10, b: 60 },
-      showlegend: false,
-      plot_bgcolor: 'rgba(0,0,0,0)',
-      paper_bgcolor: 'rgba(0,0,0,0)',
-      font: { size: 14 },
-      xaxis: {
-        tickangle: -45,
-        tickfont: { size: 12 },
-        title: { text: 'Population', font: { size: 12 } }
-      },
-      yaxis: {
-        tickfont: { size: 10 },
-        title: { text: '', font: { size: 12 } },
-        showticklabels: true
-      }
-    };
-
-    const newPkChartData = [{
-      x: populationData.map(d => d.name),
-      y: populationData.map(d => d.pk),
-      type: 'bar' as const,
-      marker: {
-        color: populationData.map(d => d.color),
-        line: { width: 1, color: '#374151' }
-      },
-      text: populationData.map(d => d.pk.toString()),
-      textposition: 'outside' as const,
-      textfont: { size: 16 }
-    }];
-
-    const newPharmChartData = [{
-      x: populationData.map(d => d.name),
-      y: populationData.map(d => d.pe),
-      type: 'bar' as const,
-      marker: {
-        color: populationData.map(d => d.color),
-        line: { width: 1, color: '#374151' }
-      },
-      text: populationData.map(d => d.pe.toString()),
-      textposition: 'outside' as const,
-      textfont: { size: 16 }
-    }];
-
-    const newClinicalChartData = [{
-      x: clinicalData.map(d => d.name),
-      y: clinicalData.map(d => d.ct),
-      type: 'bar' as const,
-      marker: {
-        color: clinicalData.map(d => d.color),
-        line: { width: 1, color: '#374151' }
-      },
-      text: clinicalData.map(d => d.ct.toString()),
-      textposition: 'outside' as const,
-      textfont: { size: 16 }
-    }];
-
-    setChartLayout(newChartLayout);
-    setPkChartData(newPkChartData);
-    setPharmChartData(newPharmChartData);
-    setClinicalChartData(newClinicalChartData);
+    setChartLayout(layout);
+    setPkChartData(pkChartData);
+    setPharmChartData(pharmChartData);
+    setClinicalChartData(clinicalChartData);
   }, [populationData]);
 
   function handleTabChange(value: string) {
@@ -225,9 +243,10 @@ export default function Home() {
       }
       daGetPMIDs(data, searchType).then((pmidData: any) => {
         // console.log(pmidData);
-        daGetTypePopulation(pmidData).then((typeData: any) => {
-          // console.log("typeData");
-          // console.log(typeData);
+        setPmidData(pmidData);
+        daGetTypePopulation(pmidData).then((data: any) => {
+          const typeData = data as TypeData[];
+          setTypeData(typeData);
           const summaryStats = calculateSummaryStats(typeData);
           // console.log(summaryStats);
           // update overallStudyType
@@ -244,10 +263,6 @@ export default function Home() {
           const thePopulationData = preparePopulationData(pkPlotData, pePlotData, ctPlotData);
 
           setPopulationData(thePopulationData);
-        });
-        daGetStudy(pmidData).then((studyData: any) => {
-          console.log("studyData");
-          console.log(studyData);
         });
       });
     });
@@ -268,13 +283,13 @@ export default function Home() {
               <h1 className="text-xl font-semibold text-gray-900">Knowledge Portal (Silver)</h1>
             </div>
             <nav className="flex space-x-8">
-              <a href="#" className="text-blue-600 border-b-2 border-blue-600 px-1 py-2 text-sm font-medium">
+              <a href="/" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
                 Explore
               </a>
               <a href="#" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
-                How we help the comunity
+                How we help the community
               </a>
-              <a href="#" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
+              <a href="/about" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
                 About
               </a>
             </nav>
@@ -284,7 +299,7 @@ export default function Home() {
 
       <div className="flex">
         {/* Left Sidebar */}
-        <div className={`${sidebarExpanded ? 'w-64' : 'w-16'} bg-gray-100 min-h-screen transition-all duration-300 ease-in-out relative overflow-visible`}>
+        <div className={`${sidebarExpanded ? 'w-64' : 'w-16'} bg-gray-100 min-h-screen transition-all duration-300 ease-in-out relative overflow-visible min-w-[250px]`}>
           {/* Toggle Button */}
           <button
             onClick={() => setSidebarExpanded(!sidebarExpanded)}
@@ -476,7 +491,7 @@ export default function Home() {
           </div>
         </div>
 
-                {/* Main Content */}
+        {/* Main Content */}
         <div className="flex-1 bg-white p-10">
           {/* Tabs */}
           <Tabs.Root 
@@ -496,17 +511,37 @@ export default function Home() {
                 <BarChart3 className="w-4 h-4" />
                 <span>Overview</span>
               </Tabs.Trigger>
-              
-              {hasDrugSearched && (
-                <Tabs.Trigger
-                  value="drug"
-                  className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                >
-                  <BarChart3 className="w-4 h-4" />
-                  <span>Drug</span>
-                </Tabs.Trigger>
-              )}
-            </Tabs.List>
+
+          {hasDrugSearched && (
+            <Tabs.Trigger
+              value="drug"
+              className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Drug</span>
+            </Tabs.Trigger>
+          )}
+          
+          {concepts.length > 0 && (
+            <Tabs.Trigger
+              value="publication"
+              className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Publication</span>
+            </Tabs.Trigger>
+          )}
+                    {concepts.length > 0 && (
+            <Tabs.Trigger
+              value="pk-models"
+              className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              <BarChart3 className="w-4 h-2 text-blue-600" />
+              <span>PK Models</span>
+            </Tabs.Trigger>
+          )}
+          
+        </Tabs.List>
 
             <Tabs.Content 
               value="overview" 
@@ -527,21 +562,51 @@ export default function Home() {
               )}
             </Tabs.Content>
             
-            {hasDrugSearched && (
-              <Tabs.Content 
-                value="drug" 
-                className="outline-none animate-in fade-in-0 slide-in-from-right-1 duration-300"
-              >
-                {isTabSwitching && activeTab !== 'drug' ? (
-                  <div className="flex items-center justify-center h-32">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  </div>
-                ) : (
-                  <DrugTab selectedDrug={selectedDrug} concepts={concepts} />
-                )}
-              </Tabs.Content>
+                      {hasDrugSearched && (
+            <Tabs.Content 
+              value="drug" 
+              className="outline-none animate-in fade-in-0 slide-in-from-right-1 duration-300"
+            >
+              {isTabSwitching && activeTab !== 'drug' ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <DrugTab selectedDrug={selectedDrug} concepts={concepts} />
+              )}
+            </Tabs.Content>
+          )}
+          
+          {concepts.length > 0 && (
+          <Tabs.Content 
+            value="publication" 
+            className="outline-none animate-in fade-in-0 slide-in-from-right-1 duration-300"
+          >
+            {isTabSwitching && activeTab !== 'publication' ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <PublicationTab pmidData={pmidData} typeData={typeData} />
             )}
-          </Tabs.Root>
+          </Tabs.Content>
+          )}
+                    {concepts.length > 0 && (
+            <Tabs.Content 
+              value="pk-models" 
+              className="outline-none animate-in fade-in-0 slide-in-from-right-1 duration-300"
+            >
+              {isTabSwitching && activeTab !== 'pk-models' ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <PKModelsTab />
+              )}
+            </Tabs.Content>
+          )}
+          
+        </Tabs.Root>
         </div>
       </div>
     </div>

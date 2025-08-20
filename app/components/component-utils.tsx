@@ -1,6 +1,12 @@
 import { Database, Folder, FolderOpen, FileText } from 'lucide-react';
 
-import { ATCData, LabelStatsData } from "../libs/database/types";
+import { ATCData, LabelStatsData, StudyData, TypeData } from "../libs/database/types";
+
+// Types for react-data-grid
+interface RenderCellProps {
+  row: any;
+  column: any;
+}
 
 
 export interface RCTreeNode {
@@ -103,65 +109,165 @@ export const LabelStatsTableColumns = [{
   minWidth: 200,
   maxWidth: 500,
   resizable: true,
+  renderCell: ({ row, column }: RenderCellProps) => (
+    <div title={row[column.key]} className="truncate">
+      {row[column.key]}
+    </div>
+  ),
 }, {
   key: "nursing_mothers",
   name: "Nursing Mothers",
-  width: 150,
+  width: 100,
   minWidth: 100,
-  maxWidth: 200,
+  maxWidth: 150,
   resizable: true,
+  headerRenderer: ({ column }: { column: any }) => (
+    <div 
+      title={column.name}
+      className="truncate font-medium text-center"
+      style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+    >
+      {column.name}
+    </div>
+  ),
+  renderCell: ({ row, column }: RenderCellProps) => (
+    <div title={row[column.key]} className="truncate text-center">
+      {row[column.key]}
+    </div>
+  ),
 }, {
   key: "carcinogenesis_and_mutagenesis_and_impairment_of_fertility",
   name: "Carcinogenesis and Mutagenesis and Impairment of Fertility",
   width: 200,
-  minWidth: 150,
-  maxWidth: 300,
+  minWidth: 100,
+  maxWidth: 250,
   resizable: true,
+  headerRenderer: ({ column }: { column: any }) => (
+    <div title={column.name} className="truncate font-medium">
+      {column.name}
+    </div>
+  ),
+  renderCell: ({ row, column }: RenderCellProps) => (
+    <div title={row[column.key]} className="truncate text-center">
+      {row[column.key]}
+    </div>
+  ),
 }, {
   key: "pregnancy",
   name: "Pregnancy",
-  width: 120,
+  width: 100,
   minWidth: 100,
-  maxWidth: 180,
+  maxWidth: 150,
   resizable: true,
+  headerRenderer: ({ column }: { column: any }) => (
+    <div title={column.name} className="truncate font-medium text-center">
+      {column.name}
+    </div>
+  ),
+  renderCell: ({ row, column }: RenderCellProps) => (
+    <div title={row[column.key]} className="truncate text-center">
+      {row[column.key]}
+    </div>
+  ),
 }, {
   key: "pediatric_use",
   name: "Pediatric Use",
-  width: 120,
+  width: 100,
   minWidth: 100,
-  maxWidth: 180,
+  maxWidth: 150,
   resizable: true,
+  headerRenderer: ({ column }: { column: any }) => (
+    <div title={column.name} className="truncate font-medium text-center">
+      {column.name}
+    </div>
+  ),
+  renderCell: ({ row, column }: RenderCellProps) => (
+    <div title={row[column.key]} className="truncate text-center">
+      {row[column.key]}
+    </div>
+  ),
 }, {
   key: "teratogenic_effects",
   name: "Teratogenic Effects",
   width: 150,
-  minWidth: 120,
+  minWidth: 100,
   maxWidth: 200,
   resizable: true,
+  headerRenderer: ({ column }: { column: any }) => (
+    <div title={column.name} className="truncate font-medium text-center">
+      {column.name}
+    </div>
+  ),
+  renderCell: ({ row, column }: RenderCellProps) => (
+    <div title={row[column.key]} className="truncate text-center">
+      {row[column.key]}
+    </div>
+  ),
 }, {
   key: "pregnancy_or_breast_feeding",
   name: "Pregnancy or Breast Feeding",
-  width: 180,
-  minWidth: 150,
+  width: 200,
+  minWidth: 100,
   maxWidth: 250,
   resizable: true,
+  headerRenderer: ({ column }: { column: any }) => (
+    <div title={column.name} className="truncate font-medium text-center">
+      {column.name}
+    </div>
+  ),
+  renderCell: ({ row, column }: RenderCellProps) => (
+    <div title={row[column.key]} className="truncate text-center">
+      {row[column.key]}
+    </div>
+  ),
 }, {
   key: "labor_and_delivery",
   name: "Labor and Delivery",
-  width: 140,
-  minWidth: 120,
-  maxWidth: 200,
+  width: 100,
+  minWidth: 100,
+  maxWidth: 150,
   resizable: true,
+  headerRenderer: ({ column }: { column: any }) => (
+    <div title={column.name} className="truncate font-medium text-center">
+      {column.name}
+    </div>
+  ),
+  renderCell: ({ row, column }: RenderCellProps) => (
+    <div title={row[column.key]} className="truncate text-center">
+      {row[column.key]}
+    </div>
+  ),
 }, {
   key: "nonteratogenic_effects",
   name: "Non-Teratogenic Effects",
-  width: 180,
-  minWidth: 150,
-  maxWidth: 250,
+  width: 100,
+  minWidth: 100,
+  maxWidth: 150,
   resizable: true,
+  headerRenderer: ({ column }: { column: any }) => (
+    <div title={column.name} className="truncate font-medium text-center">
+      {column.name}
+    </div>
+  ),
+  renderCell: ({ row, column }: RenderCellProps) => (
+    <div title={row[column.key]} className="truncate text-center">
+      {row[column.key]}
+    </div>
+  ),
 }]
 
-export const buildLabelStatsTable = (data: LabelStatsData[]) => {
+export interface LabelStatsTableRow {
+  TITLE: string;
+  nursing_mothers: string;
+  carcinogenesis_and_mutagenesis_and_impairment_of_fertility: string;
+  pregnancy: string;
+  pediatric_use: string;
+  teratogenic_effects: string;
+  pregnancy_or_breast_feeding: string;
+  labor_and_delivery: string;
+  nonteratogenic_effects: string;
+}
+export const buildLabelStatsTable = (data: LabelStatsData[]): LabelStatsTableRow[] => {
   return data.map(item => {
     return {
       TITLE: item.TITLE,
@@ -177,3 +283,24 @@ export const buildLabelStatsTable = (data: LabelStatsData[]) => {
   })
 }
 
+export interface PublicationTableRow {
+  PMID: string;
+  Title: string;
+  Year: string;
+  StudiedDrugs: string;
+  StudiedDiseases: string;
+  StudyType: string;
+  Population: string;
+}
+export const buildPublicationTable = (data: StudyData[], typeData: TypeData[]): PublicationTableRow[] => {
+  const typeMap = new Map<string, TypeData>(typeData.map(item => [item.pmid, item]));
+
+  return data.map(item => {
+    const type = typeMap.get(item.PMID);
+    return {
+      ...item,
+      StudyType: type?.study_type || "",
+      Population: type?.population || "",
+    }
+  })
+}

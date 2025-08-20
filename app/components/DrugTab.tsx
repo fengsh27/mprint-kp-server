@@ -6,7 +6,7 @@ import { Info, ChevronDown } from 'lucide-react';
 import * as Accordion from '@radix-ui/react-accordion';
 import 'react-data-grid/lib/styles.css';
 import { DataGrid } from 'react-data-grid';
-import { buildLabelStatsTable, LabelStatsTableColumns, RCTreeNode } from './component-utils';
+import { buildLabelStatsTable, LabelStatsTableColumns, LabelStatsTableRow, RCTreeNode } from './component-utils';
 import { build_atc_tree, getAtcCustomIcon } from './component-utils';
 import { ConceptRow, EPCData, LabelStatsData, MOAData, PEData, PKData } from '../libs/database/types';
 import { daGetExtraData } from '../dataprovider/dataaccessor';
@@ -58,14 +58,14 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
   const [showEntries, setShowEntries] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [atcTree, setAtcTree] = useState<RCTreeNode[]>([]);
-  const [labelStatsData, setLabelStatsData] = useState<LabelStatsData[]>([]);
+  const [labelStatsData, setLabelStatsData] = useState<LabelStatsTableRow[]>([]);
 
 
   useEffect(() => {
 
     daGetExtraData(concepts, "atc").then((atcData: any) => {
-      console.log("atcData");
-      console.log(atcData);
+      // console.log("atcData");
+      // console.log(atcData);
       // setAtcData(atcData);
       const atc_tree = build_atc_tree(atcData);
       setAtcTree(atc_tree);
@@ -124,8 +124,6 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
       setPkData(pkData);
     });
     daGetExtraData(concepts, "label_stats").then((data: any) => {
-      console.log("label_stats");
-      console.log(data);
       const labelStatsData = data as LabelStatsData[];
       setLabelStatsData(buildLabelStatsTable(labelStatsData));
     });

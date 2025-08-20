@@ -77,4 +77,17 @@ export type LabelStatsData = {
   TITLE: string;
 }
 
+export type StudyData = {
+  PMID: string;
+  Title: string;
+  Year: string;
+  StudiedDrugs: string;
+  StudiedDiseases: string;
+}
+
+export type TypeData = {
+  pmid: string;
+  study_type: string;
+  population: string;
+}
 
