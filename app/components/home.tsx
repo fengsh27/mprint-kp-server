@@ -268,6 +268,13 @@ export default function Home() {
     });
   }
 
+  function handleSearchModeChange(e: any) {
+    setSearchMode(e.target.value);
+    if (e.target.value === 'simple') {
+      setSelectedDisease('');
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -340,7 +347,7 @@ export default function Home() {
                           name="searchMode"
                           value="simple"
                           checked={searchMode === 'simple'}
-                          onChange={(e) => setSearchMode(e.target.value)}
+                          onChange={handleSearchModeChange}
                           className="mr-2"
                         />
                         <span className="text-sm text-gray-700">Simple</span>
@@ -519,7 +526,7 @@ export default function Home() {
               )}
             </Tabs.Content>
             
-                      {hasDrugSearched && (
+          {hasDrugSearched && (
             <Tabs.Content 
               value="drug" 
               className="outline-none animate-in fade-in-0 slide-in-from-right-1 duration-300"
