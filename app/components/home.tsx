@@ -286,9 +286,6 @@ export default function Home() {
               <a href="/" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
                 Explore
               </a>
-              <a href="#" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
-                How we help the community
-              </a>
               <a href="/about" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
                 About
               </a>
@@ -299,7 +296,7 @@ export default function Home() {
 
       <div className="flex">
         {/* Left Sidebar */}
-        <div className={`${sidebarExpanded ? 'w-64' : 'w-16'} bg-gray-100 min-h-screen transition-all duration-300 ease-in-out relative overflow-visible min-w-[250px]`}>
+        <div className={`${sidebarExpanded ? 'w-64' : 'w-16'} bg-gray-100 min-h-screen transition-all duration-300 ease-in-out relative overflow-visible ${sidebarExpanded ? 'min-w-[250px]' : 'min-w-[64px]'}`}>
           {/* Toggle Button */}
           <button
             onClick={() => setSidebarExpanded(!sidebarExpanded)}
@@ -444,38 +441,7 @@ export default function Home() {
             </Accordion.Item>
 
             {/* Download Data Section */}
-            <Accordion.Item value="download" className="bg-white rounded-lg shadow-sm">
-              <Accordion.Trigger className="flex items-center justify-between w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <Download className="w-5 h-5 text-gray-600" />
-                  <span className="text-gray-900 font-medium">Download Data</span>
-                </div>
-                <ChevronDownIcon className="w-5 h-5 text-gray-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-              </Accordion.Trigger>
-              
-              <Accordion.Content className="px-3 pb-3">
-                <div className="pt-2 space-y-3">
-                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm text-gray-700">Study Data</span>
-                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                      Download CSV
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm text-gray-700">Population Data</span>
-                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                      Download CSV
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm text-gray-700">Chart Data</span>
-                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                      Download JSON
-                    </button>
-                  </div>
-                </div>
-              </Accordion.Content>
-            </Accordion.Item>
+            
           </Accordion.Root>
           ) : (
             // Collapsed sidebar - show only icons
@@ -531,15 +497,6 @@ export default function Home() {
               <span>Publication</span>
             </Tabs.Trigger>
           )}
-                    {concepts.length > 0 && (
-            <Tabs.Trigger
-              value="pk-models"
-              className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
-              <BarChart3 className="w-4 h-2 text-blue-600" />
-              <span>PK Models</span>
-            </Tabs.Trigger>
-          )}
           
         </Tabs.List>
 
@@ -591,21 +548,7 @@ export default function Home() {
             )}
           </Tabs.Content>
           )}
-                    {concepts.length > 0 && (
-            <Tabs.Content 
-              value="pk-models" 
-              className="outline-none animate-in fade-in-0 slide-in-from-right-1 duration-300"
-            >
-              {isTabSwitching && activeTab !== 'pk-models' ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                </div>
-              ) : (
-                <PKModelsTab />
-              )}
-            </Tabs.Content>
-          )}
-          
+                      
         </Tabs.Root>
         </div>
       </div>
