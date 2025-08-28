@@ -20,6 +20,27 @@ const customStyles = `
   .rdg-header-row {
     white-space: nowrap !important;
   }
+  
+  .rdg-cell a {
+    cursor: pointer !important;
+  }
+  
+  .rdg-cell a:hover {
+    cursor: pointer !important;
+  }
+  
+  .rdg-cell a[href*="pubmed"] {
+    cursor: pointer !important;
+  }
+  
+  .rdg-cell a[href*="pubmed"]:hover {
+    cursor: pointer !important;
+  }
+  
+  /* Force cursor pointer on all links in DataGrid */
+  .rdg-cell *[style*="cursor: pointer"] {
+    cursor: pointer !important;
+  }
 `;
 
 const PublicationTableColumns = [
@@ -32,7 +53,20 @@ const PublicationTableColumns = [
     resizable: true,
     renderCell: ({ row, column }: { row: any; column: any }) => (
       <div className="break-words">
-        {row[column.key]}
+        <a 
+          href={`https://pubmed.ncbi.nlm.nih.gov/${row[column.key]}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800 underline hover:no-underline transition-colors duration-200"
+          style={{ 
+            cursor: 'pointer',
+            display: 'inline-block',
+            textDecoration: 'underline'
+          }}
+          
+        >
+          {row[column.key]}
+        </a>
       </div>
     ),
   },

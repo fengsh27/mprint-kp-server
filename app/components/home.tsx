@@ -5,6 +5,8 @@ import { Search, Download, BarChart3, Info, ChevronDownIcon } from 'lucide-react
 import Image from 'next/image';
 import * as Accordion from '@radix-ui/react-accordion';
 import * as Tabs from '@radix-ui/react-tabs';
+import { useQueryState } from 'nuqs';
+import { useDebouncedCallback } from "use-debounce";
 import VirtualizedSelect from './VirtualizedSelect';
 import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
@@ -113,12 +115,24 @@ function calculatePlotData(populationData: any[]) {
   };
 }
 
+function isQueryStateValid(queryState: any) {
+  return queryState && queryState.length > 0;
+}
+
 export default function Home() {
   const [searchMode, setSearchMode] = useState('simple');
   const [drugList, setDrugList] = useState<string[]>([]);
   const [diseaseList, setDiseaseList] = useState<{TERM: string, des: string}[]>([]);
   const [selectedDrug, setSelectedDrug] = useState('');
   const [selectedDisease, setSelectedDisease] = useState('');
+   
+  const[queryDrug, setQueryDrug] = useQueryState('drug', { 
+    defaultValue: '', 
+  });
+  const [queryDisease, setQueryDisease] = useQueryState('disease', { 
+    defaultValue: '', 
+  });
+  
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [hasDrugSearched, setHasDrugSearched] = useState(false);
@@ -174,7 +188,10 @@ export default function Home() {
     }
   });
 
-  useEffect(() => {
+  // initialize overview data
+  // 1. populate overall study type
+  // 2. populate drug list
+  const initializeOverview = useDebouncedCallback(() => {
     daGetOverallStudyType().then((overall_study_type: any) => {
       setOverallStudyType(overall_study_type);
     });
@@ -184,17 +201,53 @@ export default function Home() {
       ).map(item => item.name);
       setDrugList(drugs);
     });
-    // postTest();
-  }, []);
+  });
+
+  // populate disease list and set selected disease to advanced if disease is selected
+  const populateDiseaseList = (disease?: string) => {
+    daGetDiseaseList().then((data: any) => {
+      const diseases = (data.disease as Array<{TERM: string, des: string}>);
+      setDiseaseList(diseases);
+      if (disease) {
+        setSelectedDisease(disease);
+      }
+    });
+  };
 
   useEffect(() => {
     if (searchMode === 'advanced' && diseaseList.length === 0) {
-      daGetDiseaseList().then((data: any) => {
-        const diseases = (data.disease as Array<{TERM: string, des: string}>);
-        setDiseaseList(diseases);
-      });
+      populateDiseaseList()
     }
   }, [searchMode]);
+
+  // Auto-search when URL parameters are present on page load
+  useEffect(() => {
+    if (isQueryStateValid(queryDrug) || isQueryStateValid(queryDisease)) {
+      // populate drug list and set selected drug to advanced if drug is selected
+      if (isQueryStateValid(queryDrug)) {
+        daGetDrugList().then((data: any) => {
+          const drugs = (data.druglist as Array<{name: string, type: string}>).filter(
+            (item) => item.type == "drug"
+          ).map(item => item.name);
+          setDrugList(drugs);
+          setSelectedDrug(queryDrug);
+        });        
+      }
+      if (isQueryStateValid(queryDisease)) {
+        setSearchMode('advanced');
+        populateDiseaseList(queryDisease);
+      }
+      // Trigger search after a short delay to ensure data is loaded
+      const timer = setTimeout(() => {
+        if (isQueryStateValid(queryDrug) || isQueryStateValid(queryDisease)) {
+          handleConceptChange(queryDrug??"", queryDisease??"");
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      initializeOverview();
+    }
+  }, []);
 
   useEffect(() => {
     if (!pmidData || pmidData.length === 0 || !typeData || typeData.length === 0) {
@@ -204,6 +257,8 @@ export default function Home() {
       const studyData = data as StudyData[];
       const publicationData = buildPublicationTable(studyData, typeData);
       setPublicationData(publicationData);
+    }).catch((error: any) => {
+      console.error('Error fetching study data:', error);
     });
   }, [pmidData, typeData]);
 
@@ -240,9 +295,17 @@ export default function Home() {
     setTimeout(() => setIsTabSwitching(false), 150);
   }
 
-  function handleSearch() {
-    handleTabChange("overview");
-    daGetConcepts(selectedDrug, selectedDisease).then((data: any) => {
+  const handleConceptChange = useDebouncedCallback((drug: string, disease: string) => {
+    // Don't search if both parameters are empty
+    if (!drug && !disease) {
+      return;
+    }
+    
+    // Ensure we have valid string parameters
+    const safeDrug = String(drug || '');
+    const safeDisease = String(disease || '');
+    
+    daGetConcepts(safeDrug, safeDisease).then((data: any) => {
       if (!data || data.length === 0) {
         return;
       }
@@ -250,26 +313,19 @@ export default function Home() {
       const isDrugConceptQueried = concepts.some(concept => concept.type === "drug");
       setHasDrugSearched(isDrugConceptQueried);
       setConcepts(concepts);
-      // daGetExtraData(data, "atc").then((atcData: any) => {
-      //   console.log("atcData");
-      //   console.log(atcData);
-      // });
       const searchType: SearchType = [];
-      if (selectedDrug) {
+      if (safeDrug) {
         searchType.push("Drug");
       }
-      if (selectedDisease) {
+      if (safeDisease) {
         searchType.push("Disease");
       }
       daGetPMIDs(data, searchType).then((pmidData: any) => {
-        // console.log(pmidData);
         setPmidData(pmidData);
         daGetTypePopulation(pmidData).then((data: any) => {
           const typeData = data as TypeData[];
           setTypeData(typeData);
           const summaryStats = calculateSummaryStats(typeData);
-          // console.log(summaryStats);
-          // update overallStudyType
           const newOverallStudyType = {...overallStudyType};
           newOverallStudyType.pk.count = summaryStats.find(stat => stat.study_type.toLowerCase()==="pk")?.count ?? 0;
           newOverallStudyType.pe.count = summaryStats.find(stat => stat.study_type.toLowerCase()==="pe")?.count ?? 0;
@@ -286,13 +342,45 @@ export default function Home() {
         });
       });
     });
+  }, 500);
+
+  function handleSearch() {
+    if (!selectedDrug && !selectedDisease) {
+      return; // Don't search if no parameters are selected
+    }
+    setQueryDrug(selectedDrug ?? "");
+    setQueryDisease(selectedDisease ?? "");
+    handleTabChange("overview");
+    handleConceptChange(selectedDrug, selectedDisease);
   }
 
   function handleSearchModeChange(e: any) {
     setSearchMode(e.target.value);
     if (e.target.value === 'simple') {
-      setSelectedDisease('');
+      try {
+        setSelectedDisease('');
+      } catch (error) {
+        console.warn('Error clearing disease selection:', error);        
+      }
     }
+  }
+
+  function clearAllSearch() {
+    try {
+      setSelectedDrug('');
+      setSelectedDisease('');
+      setQueryDrug('');
+      setQueryDisease('');
+      initializeOverview();
+    } catch (error) {
+      console.warn('Error clearing search parameters:', error);
+    }
+    setConcepts([]);
+    setPmidData([]);
+    setTypeData([]);
+    setPublicationData([]);
+    setHasDrugSearched(false);
+    setActiveTab('overview');
   }
 
   function handleDownload() {
@@ -317,7 +405,7 @@ export default function Home() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <a style={{marginLeft: `${logoSize.w - 8}px`}} href="https://www.mprint.org/" target="_blank">
-                  <Image src="/images/mprint-logo.png" alt="mprint logo" width="180" height="60" />
+                  <Image src="/images/mprint-logo.png" alt="mprint logo" width="180" height="60" priority />
                 </a>              
               </div>
               <h1 className="text-xl font-semibold text-gray-900">Knowledge Portal (Silver)</h1>
@@ -422,7 +510,13 @@ export default function Home() {
                       
                       {selectedDrug && (
                         <button
-                          onClick={() => setSelectedDrug('')}
+                          onClick={() => {
+                            try {
+                              setSelectedDrug('');
+                            } catch (error) {
+                              console.warn('Error clearing drug selection:', error);
+                            }
+                          }}
                           className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
                           title="Clear selection"
                         >
@@ -460,25 +554,39 @@ export default function Home() {
                         
                         {selectedDisease && (
                           <button
-                            onClick={() => setSelectedDisease('')}
+                            onClick={() => {
+                              try {
+                                setSelectedDisease('');
+                              } catch (error) {
+                                console.warn('Error clearing disease selection:', error);
+                              }
+                            }}
                             className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
                             title="Clear selection"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        </button>
                         )}
                       </div>
                     </div>
                   )}
                   
-                  <button 
-                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-                    onClick={handleSearch}
-                  >
-                    Search
-                  </button>
+                  <div className="flex space-x-2">
+                    <button 
+                      className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                      onClick={handleSearch}
+                    >
+                      Search
+                    </button>
+                    <button 
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                      onClick={clearAllSearch}
+                    >
+                      Clear
+                    </button>
+                  </div>
                 </div>
               </Accordion.Content>
             </Accordion.Item>
