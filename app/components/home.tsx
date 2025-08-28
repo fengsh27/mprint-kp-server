@@ -9,24 +9,31 @@ import VirtualizedSelect from './VirtualizedSelect';
 import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
 import PublicationTab from './PublicationTab';
-import PKModelsTab from './PKModelsTab';
 
-import { 
+import {
   daGetConcepts, 
   daGetDiseaseList, 
   daGetDrugList, 
   daGetOverallStudyType, 
   daGetPMIDs, 
+  daGetStudy, 
   daGetTypePopulation, 
-  postTest 
 } from "../dataprovider/dataaccessor";
 import { 
   ConceptRow, 
   PmidRow, 
   SearchType, 
+  StudyData, 
   TypeData 
 } from '../libs/database/types';
 import { calculateSummaryStats, preparePlotData, preparePopulationData } from '../libs/dataprocessor/utils';
+import { 
+  buildPublicationTable, 
+  downloadPublicationTableAsCsv, 
+  downloadPublicationTableAsTsv, 
+  downloadPublicationTableAsXlsx,
+  PublicationTableRow 
+} from './component-utils';
 
 
 
@@ -118,6 +125,8 @@ export default function Home() {
   const [isTabSwitching, setIsTabSwitching] = useState(false);
   const [pmidData, setPmidData] = useState<PmidRow[]>([]);
   const [typeData, setTypeData] = useState<TypeData[]>([]);
+  const [publicationData, setPublicationData] = useState<PublicationTableRow[]>([]);
+  const [downloadType, setDownloadType] = useState<'xlsx' | 'csv' | 'tsv'>('xlsx');
 
   const [overallStudyType, setOverallStudyType] = useState({
     pk: {
@@ -186,6 +195,17 @@ export default function Home() {
       });
     }
   }, [searchMode]);
+
+  useEffect(() => {
+    if (!pmidData || pmidData.length === 0 || !typeData || typeData.length === 0) {
+      return;
+    }
+    daGetStudy(pmidData).then((data: any) => {
+      const studyData = data as StudyData[];
+      const publicationData = buildPublicationTable(studyData, typeData);
+      setPublicationData(publicationData);
+    });
+  }, [pmidData, typeData]);
 
   // Handle window resize for responsive charts
   useEffect(() => {
@@ -275,6 +295,19 @@ export default function Home() {
     }
   }
 
+  function handleDownload() {
+    if (!publicationData || publicationData.length === 0) {
+      return;
+    }
+    if (downloadType === 'xlsx') {
+      downloadPublicationTableAsXlsx(publicationData);
+    } else if (downloadType === 'csv') {
+      downloadPublicationTableAsCsv(publicationData);
+    } else if (downloadType === 'tsv') {
+      downloadPublicationTableAsTsv(publicationData);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -292,6 +325,9 @@ export default function Home() {
             <nav className="flex space-x-8">
               <a href="/" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
                 Explore
+              </a>
+              <a href="#" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
+                How we help the community
               </a>
               <a href="/about" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
                 About
@@ -448,7 +484,84 @@ export default function Home() {
             </Accordion.Item>
 
             {/* Download Data Section */}
-            
+            <Accordion.Item value="download" className="bg-white rounded-lg shadow-sm">
+              <Accordion.Trigger className="flex items-center justify-between w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <Download className="w-5 h-5 text-gray-600" />
+                  <span className="text-gray-900 font-medium">Download Data</span>
+                </div>
+                <ChevronDownIcon className="w-5 h-5 text-gray-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+              </Accordion.Trigger>
+              
+              <Accordion.Content className="px-3 pb-3">
+                <div className="pt-2 space-y-3">
+                  {(!publicationData || publicationData.length === 0) && (
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <div className="flex items-center space-x-2">
+                        <svg className="w-4 h-4 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm text-yellow-800 font-medium">Please select drug or disease first</span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="text-sm text-gray-700 font-medium mb-3">
+                    Download Publication Data as:
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="download-format" 
+                        value="excel" 
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                        disabled={!publicationData || publicationData.length === 0}
+                        checked={downloadType === 'xlsx'}
+                        onChange={() => setDownloadType('xlsx')}
+                      />
+                      <span className="text-sm text-gray-700">Excel</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="download-format" 
+                        value="csv" 
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                        disabled={!publicationData || publicationData.length === 0}
+                        checked={downloadType === 'csv'}
+                        onChange={() => setDownloadType('csv')}
+                      />
+                      <span className="text-sm text-gray-700">CSV</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="download-format" 
+                        value="tsv" 
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                        disabled={!publicationData || publicationData.length === 0}
+                        checked={downloadType === 'tsv'}
+                        onChange={() => setDownloadType('tsv')}
+                      />
+                      <span className="text-sm text-gray-700">TSV</span>
+                    </label>
+                  </div>
+                  <div className="pt-3">
+                    <button 
+                      className={`w-full py-2 px-4 rounded-md transition-colors ${
+                        (!pmidData || pmidData.length === 0 || !typeData || typeData.length === 0)
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                      disabled={!publicationData || publicationData.length === 0}
+                      onClick={handleDownload}
+                    >
+                      Download
+                    </button>
+                  </div>
+                </div>
+              </Accordion.Content>
+            </Accordion.Item>
           </Accordion.Root>
           ) : (
             // Collapsed sidebar - show only icons
@@ -551,7 +664,7 @@ export default function Home() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
             ) : (
-              <PublicationTab pmidData={pmidData} typeData={typeData} />
+              <PublicationTab publicationData={publicationData} />
             )}
           </Tabs.Content>
           )}
