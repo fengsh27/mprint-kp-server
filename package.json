@@ -23,7 +23,8 @@
     "react-data-grid": "^7.0.0-beta.57",
     "react-dom": "19.1.0",
     "react-plotly.js": "^2.6.0",
-    "react-virtualized": "^9.22.6"
+    "react-virtualized": "^9.22.6",
+    "write-excel-file": "^2.3.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -32,6 +33,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-plotly.js": "^2.6.3",
+    "standard-version": "^9.5.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

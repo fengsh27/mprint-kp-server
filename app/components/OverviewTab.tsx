@@ -123,16 +123,7 @@ export default function OverviewTab({
         {/* Clinical Trial Chart */}
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm min-h-[400px] flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Clinical trial by population</h3>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-white border border-gray-300 rounded flex items-center justify-center">
-                <Plus className="w-3 h-3 text-gray-600" />
-              </div>
-              <div className="w-4 h-4 bg-white border border-gray-300 rounded"></div>
-              <div className="w-6 h-6 bg-pink-400 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                CA
-              </div>
-            </div>
+            <h3 className="text-lg font-semibold text-gray-900">Clinical trial by population</h3>            
           </div>
           {isChartDataEmpty(clinicalChartData) ? (
             <div className="flex items-center justify-center h-full">

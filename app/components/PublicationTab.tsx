@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import 'react-data-grid/lib/styles.css';
 import { DataGrid } from 'react-data-grid';
-import { daGetStudy } from '../dataprovider/dataaccessor';
-import { PmidRow, StudyData, TypeData } from '../libs/database/types';
-import { buildPublicationTable, PublicationTableRow } from './component-utils';
+// import { daGetStudy } from '../dataprovider/dataaccessor';
+// import { PmidRow, StudyData, TypeData } from '../libs/database/types';
+import { PublicationTableRow } from './component-utils';
 
 // Custom styles for better text wrapping
 const customStyles = `
@@ -117,15 +117,16 @@ const PublicationTableColumns = [
 ];
 
 export interface PublicationTabProps {
-  pmidData: PmidRow[];
-  typeData: TypeData[];
+  publicationData: PublicationTableRow[];
+  // pmidData: PmidRow[];
+  // typeData: TypeData[];
 }
 
-export default function PublicationTab({ pmidData, typeData }: PublicationTabProps) {
+export default function PublicationTab({ publicationData }: PublicationTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showEntries, setShowEntries] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-  const [publicationData, setPublicationData] = useState<PublicationTableRow[]>([]);
+  // const [publicationData, setPublicationData] = useState<PublicationTableRow[]>([]);
 
   const filteredData = publicationData.filter(item =>
     Object.values(item).some(value =>
@@ -138,13 +139,13 @@ export default function PublicationTab({ pmidData, typeData }: PublicationTabPro
   const endIndex = startIndex + showEntries;
   const paginatedData = filteredData.slice(startIndex, endIndex);
 
-  useEffect(() => {
-    daGetStudy(pmidData).then((data: any) => {
-      const studyData = data as StudyData[];
-      const publicationData = buildPublicationTable(studyData, typeData);
-      setPublicationData(publicationData);
-    });
-  }, [pmidData, typeData]);
+  // useEffect(() => {
+  //   daGetStudy(pmidData).then((data: any) => {
+  //     const studyData = data as StudyData[];
+  //     const publicationData = buildPublicationTable(studyData, typeData);
+  //     setPublicationData(publicationData);
+  //   });
+  // }, [pmidData, typeData]);
 
   if (publicationData.length === 0) {
     return (

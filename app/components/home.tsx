@@ -9,24 +9,31 @@ import VirtualizedSelect from './VirtualizedSelect';
 import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
 import PublicationTab from './PublicationTab';
-import PKModelsTab from './PKModelsTab';
 
-import { 
+import {
   daGetConcepts, 
   daGetDiseaseList, 
   daGetDrugList, 
   daGetOverallStudyType, 
   daGetPMIDs, 
+  daGetStudy, 
   daGetTypePopulation, 
-  postTest 
 } from "../dataprovider/dataaccessor";
 import { 
   ConceptRow, 
   PmidRow, 
   SearchType, 
+  StudyData, 
   TypeData 
 } from '../libs/database/types';
 import { calculateSummaryStats, preparePlotData, preparePopulationData } from '../libs/dataprocessor/utils';
+import { 
+  buildPublicationTable, 
+  downloadPublicationTableAsCsv, 
+  downloadPublicationTableAsTsv, 
+  downloadPublicationTableAsXlsx,
+  PublicationTableRow 
+} from './component-utils';
 
 
 
@@ -118,6 +125,8 @@ export default function Home() {
   const [isTabSwitching, setIsTabSwitching] = useState(false);
   const [pmidData, setPmidData] = useState<PmidRow[]>([]);
   const [typeData, setTypeData] = useState<TypeData[]>([]);
+  const [publicationData, setPublicationData] = useState<PublicationTableRow[]>([]);
+  const [downloadType, setDownloadType] = useState<'xlsx' | 'csv' | 'tsv'>('xlsx');
 
   const [overallStudyType, setOverallStudyType] = useState({
     pk: {
@@ -186,6 +195,17 @@ export default function Home() {
       });
     }
   }, [searchMode]);
+
+  useEffect(() => {
+    if (!pmidData || pmidData.length === 0 || !typeData || typeData.length === 0) {
+      return;
+    }
+    daGetStudy(pmidData).then((data: any) => {
+      const studyData = data as StudyData[];
+      const publicationData = buildPublicationTable(studyData, typeData);
+      setPublicationData(publicationData);
+    });
+  }, [pmidData, typeData]);
 
   // Handle window resize for responsive charts
   useEffect(() => {
@@ -268,6 +288,26 @@ export default function Home() {
     });
   }
 
+  function handleSearchModeChange(e: any) {
+    setSearchMode(e.target.value);
+    if (e.target.value === 'simple') {
+      setSelectedDisease('');
+    }
+  }
+
+  function handleDownload() {
+    if (!publicationData || publicationData.length === 0) {
+      return;
+    }
+    if (downloadType === 'xlsx') {
+      downloadPublicationTableAsXlsx(publicationData);
+    } else if (downloadType === 'csv') {
+      downloadPublicationTableAsCsv(publicationData);
+    } else if (downloadType === 'tsv') {
+      downloadPublicationTableAsTsv(publicationData);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -299,7 +339,7 @@ export default function Home() {
 
       <div className="flex">
         {/* Left Sidebar */}
-        <div className={`${sidebarExpanded ? 'w-64' : 'w-16'} bg-gray-100 min-h-screen transition-all duration-300 ease-in-out relative overflow-visible min-w-[250px]`}>
+        <div className={`${sidebarExpanded ? 'w-64' : 'w-16'} bg-gray-100 min-h-screen transition-all duration-300 ease-in-out relative overflow-visible ${sidebarExpanded ? 'min-w-[250px]' : 'min-w-[64px]'}`}>
           {/* Toggle Button */}
           <button
             onClick={() => setSidebarExpanded(!sidebarExpanded)}
@@ -343,7 +383,7 @@ export default function Home() {
                           name="searchMode"
                           value="simple"
                           checked={searchMode === 'simple'}
-                          onChange={(e) => setSearchMode(e.target.value)}
+                          onChange={handleSearchModeChange}
                           className="mr-2"
                         />
                         <span className="text-sm text-gray-700">Simple</span>
@@ -455,22 +495,68 @@ export default function Home() {
               
               <Accordion.Content className="px-3 pb-3">
                 <div className="pt-2 space-y-3">
-                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm text-gray-700">Study Data</span>
-                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                      Download CSV
-                    </button>
+                  {(!publicationData || publicationData.length === 0) && (
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <div className="flex items-center space-x-2">
+                        <svg className="w-4 h-4 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm text-yellow-800 font-medium">Please select drug or disease first</span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="text-sm text-gray-700 font-medium mb-3">
+                    Download Publication Data as:
                   </div>
-                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm text-gray-700">Population Data</span>
-                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                      Download CSV
-                    </button>
+                  <div className="space-y-2">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="download-format" 
+                        value="excel" 
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                        disabled={!publicationData || publicationData.length === 0}
+                        checked={downloadType === 'xlsx'}
+                        onChange={() => setDownloadType('xlsx')}
+                      />
+                      <span className="text-sm text-gray-700">Excel</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="download-format" 
+                        value="csv" 
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                        disabled={!publicationData || publicationData.length === 0}
+                        checked={downloadType === 'csv'}
+                        onChange={() => setDownloadType('csv')}
+                      />
+                      <span className="text-sm text-gray-700">CSV</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="download-format" 
+                        value="tsv" 
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                        disabled={!publicationData || publicationData.length === 0}
+                        checked={downloadType === 'tsv'}
+                        onChange={() => setDownloadType('tsv')}
+                      />
+                      <span className="text-sm text-gray-700">TSV</span>
+                    </label>
                   </div>
-                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm text-gray-700">Chart Data</span>
-                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                      Download JSON
+                  <div className="pt-3">
+                    <button 
+                      className={`w-full py-2 px-4 rounded-md transition-colors ${
+                        (!pmidData || pmidData.length === 0 || !typeData || typeData.length === 0)
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                      disabled={!publicationData || publicationData.length === 0}
+                      onClick={handleDownload}
+                    >
+                      Download
                     </button>
                   </div>
                 </div>
@@ -531,15 +617,6 @@ export default function Home() {
               <span>Publication</span>
             </Tabs.Trigger>
           )}
-                    {concepts.length > 0 && (
-            <Tabs.Trigger
-              value="pk-models"
-              className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
-              <BarChart3 className="w-4 h-2 text-blue-600" />
-              <span>PK Models</span>
-            </Tabs.Trigger>
-          )}
           
         </Tabs.List>
 
@@ -562,7 +639,7 @@ export default function Home() {
               )}
             </Tabs.Content>
             
-                      {hasDrugSearched && (
+          {hasDrugSearched && (
             <Tabs.Content 
               value="drug" 
               className="outline-none animate-in fade-in-0 slide-in-from-right-1 duration-300"
@@ -587,25 +664,11 @@ export default function Home() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
             ) : (
-              <PublicationTab pmidData={pmidData} typeData={typeData} />
+              <PublicationTab publicationData={publicationData} />
             )}
           </Tabs.Content>
           )}
-                    {concepts.length > 0 && (
-            <Tabs.Content 
-              value="pk-models" 
-              className="outline-none animate-in fade-in-0 slide-in-from-right-1 duration-300"
-            >
-              {isTabSwitching && activeTab !== 'pk-models' ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                </div>
-              ) : (
-                <PKModelsTab />
-              )}
-            </Tabs.Content>
-          )}
-          
+                      
         </Tabs.Root>
         </div>
       </div>

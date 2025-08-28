@@ -1,6 +1,7 @@
 import { Database, Folder, FolderOpen, FileText } from 'lucide-react';
 
 import { ATCData, LabelStatsData, StudyData, TypeData } from "../libs/database/types";
+import writeXlsxFile from 'write-excel-file';
 
 // Types for react-data-grid
 interface RenderCellProps {
@@ -303,4 +304,130 @@ export const buildPublicationTable = (data: StudyData[], typeData: TypeData[]): 
       Population: type?.population || "",
     }
   })
+}
+
+
+// --- Helper Function to Sanitize Data for CSV/TSV ---
+const sanitizeCell = (cell: string) => {
+  let value = cell === null || cell === undefined ? '' : cell.toString();
+  // If the value contains a comma, a quote, or a newline, wrap it in double quotes.
+  if (value.search(/("|,|\n)/g) >= 0) {
+    // Also, escape any existing double quotes by doubling them.
+    value = `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+};
+
+// --- Helper Function to Generate Timestamp for File Names ---
+const generateTimestamp = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  
+  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+};
+
+interface DownloadTableColumn {
+  label: string;
+  value: (item: any) => string;
+}
+
+
+// --- The Reusable Download Function ---
+function downloadDelimitedFile(data: any[], columns: Array<DownloadTableColumn>, delimiter: string, fileName: string, mimeType: string) {
+  // 1. Create the header row
+  const header = columns.map(col => col.label).join(delimiter);
+
+  // 2. Create the data rows
+  const rows = data.map(item => {
+    const rowData = columns.map(col => sanitizeCell(col.value(item)));
+    return rowData.join(delimiter);
+  });
+
+  // 3. Combine header and rows with a newline
+  const content = [header, ...rows].join('\n');
+
+  // 4. Create a Blob
+  const blob = new Blob([content], { type: mimeType });
+
+  // 5. Trigger the download
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+
+// --- Specific Functions for CSV and TSV ---
+const columns: Array<DownloadTableColumn> = [
+  { label: 'PMID', value: (item: PublicationTableRow) => item.PMID },
+  { label: 'Title', value: (item: PublicationTableRow) => item.Title },
+  { label: 'Year', value: (item: PublicationTableRow) => item.Year },
+  { label: 'Studied Drugs', value: (item: PublicationTableRow) => item.StudiedDrugs },
+  { label: 'Studied Diseases', value: (item: PublicationTableRow) => item.StudiedDiseases },
+  { label: 'study_type', value: (item: PublicationTableRow) => item.StudyType },
+  { label: 'population', value: (item: PublicationTableRow) => item.Population },
+]
+export function downloadPublicationTableAsCsv(publicationData: PublicationTableRow[]) { 
+  const timestamp = generateTimestamp();
+  downloadDelimitedFile(
+    publicationData,
+    columns,
+    ',', // Comma delimiter
+    `publication_table_${timestamp}.csv`,
+    'text/csv;charset=utf-8;'
+  );
+}
+
+export function downloadPublicationTableAsTsv(publicationData: PublicationTableRow[]) {
+  const timestamp = generateTimestamp();
+  downloadDelimitedFile(
+    publicationData,
+    columns,
+    '\t', // Tab delimiter
+    `publication_table_${timestamp}.tsv`,
+    'text/tab-separated-values;charset=utf-8;'
+  );
+}
+
+
+const publicationSchema = [{
+  column: "PMID",
+  type: String,
+  value: (item: PublicationTableRow) => item.PMID,
+}, {
+  column: "Year",
+  type: String,
+  value: (item: PublicationTableRow) => item.Year,
+}, {
+  column: "Title",
+  type: String,
+  value: (item: PublicationTableRow) => item.Title,
+}, {
+  column: "Studied Drugs",
+  type: String,
+  value: (item: PublicationTableRow) => item.StudiedDrugs,
+}, {
+  column: "Studied Diseases",
+  type: String,
+  value: (item: PublicationTableRow) => item.StudiedDiseases,
+}, {
+  column: "study_type",
+  type: String,
+  value: (item: PublicationTableRow) => item.StudyType,
+}, {
+  column: "population",
+  type: String,
+  value: (item: PublicationTableRow) => item.Population,
+}];
+
+export const downloadPublicationTableAsXlsx = (publicationData: PublicationTableRow[]) => {
+  const timestamp = generateTimestamp();
+  writeXlsxFile(publicationData, { schema: publicationSchema, fileName: `publications_table_${timestamp}.xlsx` });
 }
