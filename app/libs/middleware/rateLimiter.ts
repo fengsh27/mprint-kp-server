@@ -5,6 +5,7 @@ interface RateLimitConfig {
   maxRequests: number;     // Maximum requests per window
   message: string;         // Error message
   statusCode: number;      // HTTP status code for rate limit exceeded
+  skipForLocalhost?: boolean; // Skip rate limiting for localhost
 }
 
 interface RateLimitStore {
@@ -42,20 +43,43 @@ class RateLimiter {
     const cfConnectingIP = req.headers.get('cf-connecting-ip');
     
     if (forwarded) {
+      console.log('forwarded', forwarded);
       return forwarded.split(',')[0].trim();
     }
     if (realIP) {
+      console.log('realIP', realIP);
       return realIP;
     }
     if (cfConnectingIP) {
+      console.log('cfConnectingIP', cfConnectingIP);
       return cfConnectingIP;
     }
     
-    // Fallback to connection remote address
-    return req.ip || 'unknown';
+    // Fallback to a default value since req.ip doesn't exist in NextRequest
+    console.log('fallback to unknown');
+    return 'unknown';
+  }
+
+  private isLocalhost(req: NextRequest): boolean {
+    const clientIP = this.getClientIP(req);
+    const host = req.headers.get('host') || '';
+    
+    return (
+      clientIP === '127.0.0.1' ||
+      clientIP === '::1' ||
+      clientIP === 'localhost' ||
+      host.includes('localhost') ||
+      host.includes('127.0.0.1') ||
+      host.includes('::1')
+    );
   }
 
   check(req: NextRequest): { allowed: boolean; remaining: number; resetTime: number } {
+    // Skip rate limiting for localhost if configured
+    if (this.config.skipForLocalhost && this.isLocalhost(req)) {
+      return { allowed: true, remaining: 999999, resetTime: Date.now() + this.config.windowMs };
+    }
+
     const ip = this.getClientIP(req);
     const now = Date.now();
 
@@ -104,21 +128,24 @@ export const apiRateLimiter = new RateLimiter({
   windowMs: 60 * 1000,        // 1 minute
   maxRequests: 100,            // 100 requests per minute
   message: 'Too many requests, please try again later.',
-  statusCode: 429
+  statusCode: 429,
+  skipForLocalhost: true       // Skip rate limiting for localhost
 });
 
 export const searchRateLimiter = new RateLimiter({
   windowMs: 60 * 1000,        // 1 minute
   maxRequests: 30,             // 30 search requests per minute
   message: 'Too many search requests, please try again later.',
-  statusCode: 429
+  statusCode: 429,
+  skipForLocalhost: true       // Skip rate limiting for localhost
 });
 
 export const downloadRateLimiter = new RateLimiter({
   windowMs: 60 * 1000,        // 1 minute
   maxRequests: 10,             // 10 download requests per minute
   message: 'Too many download requests, please try again later.',
-  statusCode: 429
+  statusCode: 429,
+  skipForLocalhost: true       // Skip rate limiting for localhost
 });
 
 // Rate limiting middleware function

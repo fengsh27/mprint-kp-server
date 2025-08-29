@@ -1,12 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Helper function to detect localhost requests
+export function isLocalhost(req: NextRequest): boolean {
+  const clientIP = getClientIP(req);
+  const host = req.headers.get('host') || '';
+  
+  return (
+    clientIP === '127.0.0.1' ||
+    clientIP === '::1' ||
+    clientIP === 'localhost' ||
+    host.includes('localhost') ||
+    host.includes('127.0.0.1') ||
+    host.includes('::1')
+  );
+}
+
 // Input validation and sanitization
 export class InputValidator {
   private static readonly MAX_STRING_LENGTH = 1000;
   private static readonly MAX_ARRAY_LENGTH = 1000;
   private static readonly ALLOWED_CHARS = /^[a-zA-Z0-9\s\-_.,()\[\]{}":;@#$%^&*+=<>?\/\\|~`!]+$/;
 
-  static validateString(value: string, fieldName: string): { valid: boolean; error?: string } {
+  static validateString(value: string, fieldName: string, skipForLocalhost: boolean = false, req?: NextRequest): { valid: boolean; error?: string } {
+    // Skip validation for localhost if requested
+    if (skipForLocalhost && req && isLocalhost(req)) {
+      return { valid: true };
+    }
+
     if (!value || typeof value !== 'string') {
       return { valid: false, error: `${fieldName} must be a non-empty string` };
     }
@@ -22,7 +42,12 @@ export class InputValidator {
     return { valid: true };
   }
 
-  static validateArray(value: any[], fieldName: string, maxLength: number = this.MAX_ARRAY_LENGTH): { valid: boolean; error?: string } {
+  static validateArray(value: any[], fieldName: string, maxLength: number = this.MAX_ARRAY_LENGTH, skipForLocalhost: boolean = false, req?: NextRequest): { valid: boolean; error?: string } {
+    // Skip validation for localhost if requested
+    if (skipForLocalhost && req && isLocalhost(req)) {
+      return { valid: true };
+    }
+
     if (!Array.isArray(value)) {
       return { valid: false, error: `${fieldName} must be an array` };
     }
@@ -34,21 +59,36 @@ export class InputValidator {
     return { valid: true };
   }
 
-  static validatePMID(pmid: string): { valid: boolean; error?: string } {
+  static validatePMID(pmid: string, skipForLocalhost: boolean = false, req?: NextRequest): { valid: boolean; error?: string } {
+    // Skip validation for localhost if requested
+    if (skipForLocalhost && req && isLocalhost(req)) {
+      return { valid: true };
+    }
+
     if (!/^\d{1,8}$/.test(pmid)) {
       return { valid: false, error: 'PMID must be a 1-8 digit number' };
     }
     return { valid: true };
   }
 
-  static validateCUI(cui: string): { valid: boolean; error?: string } {
+  static validateCUI(cui: string, skipForLocalhost: boolean = false, req?: NextRequest): { valid: boolean; error?: string } {
+    // Skip validation for localhost if requested
+    if (skipForLocalhost && req && isLocalhost(req)) {
+      return { valid: true };
+    }
+
     if (!/^C\d{7}$/.test(cui)) {
       return { valid: false, error: 'CUI must be in format C followed by 7 digits' };
     }
     return { valid: true };
   }
 
-  static sanitizeString(value: string): string {
+  static sanitizeString(value: string, skipForLocalhost: boolean = false, req?: NextRequest): string {
+    // Skip sanitization for localhost if requested
+    if (skipForLocalhost && req && isLocalhost(req)) {
+      return value;
+    }
+
     return value
       .trim()
       .replace(/[<>]/g, '') // Remove potential HTML tags
@@ -75,7 +115,12 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
 }
 
 // Request size limiting
-export function validateRequestSize(req: NextRequest, maxSizeMB: number = 10): { valid: boolean; error?: string } {
+export function validateRequestSize(req: NextRequest, maxSizeMB: number = 10, skipForLocalhost: boolean = false): { valid: boolean; error?: string } {
+  // Skip size validation for localhost if requested
+  if (skipForLocalhost && isLocalhost(req)) {
+    return { valid: true };
+  }
+
   const contentLength = req.headers.get('content-length');
   if (contentLength) {
     const sizeMB = parseInt(contentLength) / (1024 * 1024);
@@ -105,11 +150,30 @@ export function requireAuth(req: NextRequest): { valid: boolean; error?: string;
   return { valid: true };
 }
 
+// Helper function to get client IP from request
+function getClientIP(req: NextRequest): string {
+  const forwarded = req.headers.get('x-forwarded-for');
+  const realIP = req.headers.get('x-real-ip');
+  const cfConnectingIP = req.headers.get('cf-connecting-ip');
+  
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  if (realIP) {
+    return realIP;
+  }
+  if (cfConnectingIP) {
+    return cfConnectingIP;
+  }
+  
+  return 'unknown';
+}
+
 // Request logging for security monitoring
 export function logSecurityEvent(req: NextRequest, event: string, details?: any): void {
   const logData = {
     timestamp: new Date().toISOString(),
-    ip: req.ip || 'unknown',
+    ip: getClientIP(req),
     userAgent: req.headers.get('user-agent') || 'unknown',
     method: req.method,
     url: req.url,
@@ -122,7 +186,12 @@ export function logSecurityEvent(req: NextRequest, event: string, details?: any)
 }
 
 // SQL injection detection (basic)
-export function detectSQLInjection(input: string): boolean {
+export function detectSQLInjection(input: string, skipForLocalhost: boolean = false, req?: NextRequest): boolean {
+  // Skip SQL injection detection for localhost if requested
+  if (skipForLocalhost && req && isLocalhost(req)) {
+    return false;
+  }
+
   const sqlPatterns = [
     /(\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b)/i,
     /(\b(or|and)\b\s+\d+\s*[=<>])/i,

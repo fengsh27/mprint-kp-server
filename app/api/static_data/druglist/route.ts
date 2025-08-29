@@ -1,7 +1,7 @@
 
 
 import { NextResponse } from 'next/server';
-import * as data from "../../../data/static_data.json"
+import data from "../../../data/static_data.json"
 
 export async function GET() {  
   const druglist = (data as any).druglist as Array<any>;
@@ -17,12 +17,12 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error('Error in overall study type API:', error);
+    console.error('Error in druglist API:', error);
     
     return NextResponse.json(
       { 
         error: 'Internal Server Error',
-        message: 'Failed to fetch overall study type data'
+        message: 'Failed to fetch druglist data'
       },
       { status: 500 }
     );
