@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import * as data from "../../../data/static_data.json"
+import data from "../../../data/static_data.json"
 
 export async function GET() {  
   const overall_study_type = (data as any).overall_study_type as Array<any>;

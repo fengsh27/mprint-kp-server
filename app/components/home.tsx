@@ -47,6 +47,20 @@ const logoSize = {
   h: 100 * DEFAULT_LOGO_HEIGHT / DEFAULT_LOGO_WIDTH,
 };
 
+const DEFAULT_POPULATION_DATA = [
+  { name: 'Pediatric', pk: 270204, pe: 630043, ct: 139298, color: '#fbbf24' },
+  { name: 'Fetus', pk: 37109, pe: 60054, ct: 9072, color: '#60a5fa' },
+  { name: 'Premature', pk: 7716, pe: 15098, ct: 0, color: '#60a5fa' },
+  { name: 'Newborn', pk: 62531, pe: 130494, ct: 28553, color: '#60a5fa' },
+  { name: 'Neonate', pk: 29009, pe: 60287, ct: 14235, color: '#60a5fa' },
+  { name: 'Infant', pk: 118132, pe: 269421, ct: 66022, color: '#60a5fa' },
+  { name: 'Child', pk: 184057, pe: 457026, ct: 102569, color: '#60a5fa' },
+  { name: 'Maternal', pk: 136152, pe: 293668, ct: 57541, color: '#fbbf24' },
+  { name: 'Pregnant', pk: 85462, pe: 187872, ct: 34886, color: '#f87171' },
+  { name: 'Labor', pk: 7254, pe: 20170, ct: 7385, color: '#f87171' },
+  { name: 'Postpartum', pk: 8380, pe: 19236, ct: 4338, color: '#f87171' },
+];
+
 function calculatePlotData(populationData: any[]) {
   const clinicalData = populationData.filter(item => item.ct > 0);
     
@@ -159,19 +173,7 @@ export default function Home() {
       description: "Controlled studies evaluating the safety and efficacy of drugs in human subjects"
     }
   });
-  const [populationData, setPopulationData] = useState<any[]>([
-    { name: 'Pediatric', pk: 270204, pe: 630043, ct: 139298, color: '#fbbf24' },
-    { name: 'Fetus', pk: 37109, pe: 60054, ct: 9072, color: '#60a5fa' },
-    { name: 'Premature', pk: 7716, pe: 15098, ct: 0, color: '#60a5fa' },
-    { name: 'Newborn', pk: 62531, pe: 130494, ct: 28553, color: '#60a5fa' },
-    { name: 'Neonate', pk: 29009, pe: 60287, ct: 14235, color: '#60a5fa' },
-    { name: 'Infant', pk: 118132, pe: 269421, ct: 66022, color: '#60a5fa' },
-    { name: 'Child', pk: 184057, pe: 457026, ct: 102569, color: '#60a5fa' },
-    { name: 'Maternal', pk: 136152, pe: 293668, ct: 57541, color: '#fbbf24' },
-    { name: 'Pregnant', pk: 85462, pe: 187872, ct: 34886, color: '#f87171' },
-    { name: 'Labor', pk: 7254, pe: 20170, ct: 7385, color: '#f87171' },
-    { name: 'Postpartum', pk: 8380, pe: 19236, ct: 4338, color: '#f87171' },
-  ]);
+  const [populationData, setPopulationData] = useState<any[]>(DEFAULT_POPULATION_DATA);
   const [concepts, setConcepts] = useState<ConceptRow[]>([]);
   
   // Chart data and layout
@@ -224,15 +226,15 @@ export default function Home() {
   useEffect(() => {
     if (isQueryStateValid(queryDrug) || isQueryStateValid(queryDisease)) {
       // populate drug list and set selected drug to advanced if drug is selected
-      if (isQueryStateValid(queryDrug)) {
-        daGetDrugList().then((data: any) => {
-          const drugs = (data.druglist as Array<{name: string, type: string}>).filter(
-            (item) => item.type == "drug"
-          ).map(item => item.name);
-          setDrugList(drugs);
+      daGetDrugList().then((data: any) => {
+        const drugs = (data.druglist as Array<{name: string, type: string}>).filter(
+          (item) => item.type == "drug"
+        ).map(item => item.name);
+        setDrugList(drugs);
+        if (isQueryStateValid(queryDrug)) {
           setSelectedDrug(queryDrug);
-        });        
-      }
+        }
+      });
       if (isQueryStateValid(queryDisease)) {
         setSearchMode('advanced');
         populateDiseaseList(queryDisease);
@@ -306,7 +308,7 @@ export default function Home() {
     const safeDisease = String(disease || '');
     
     daGetConcepts(safeDrug, safeDisease).then((data: any) => {
-      if (!data || data.length === 0) {
+      if (!data) {
         return;
       }
       const concepts: ConceptRow[] = data as ConceptRow[];
@@ -372,6 +374,7 @@ export default function Home() {
       setQueryDrug('');
       setQueryDisease('');
       initializeOverview();
+      setPopulationData(DEFAULT_POPULATION_DATA);
     } catch (error) {
       console.warn('Error clearing search parameters:', error);
     }

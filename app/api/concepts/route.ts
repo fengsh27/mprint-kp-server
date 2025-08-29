@@ -92,7 +92,7 @@ async function conceptsHandler(req: Request) {
     const response = NextResponse.json(rows);
     return addSecurityHeaders(response);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in concepts API:', error);
     logSecurityEvent(req as any, 'DATABASE_ERROR', { error: error.message });
     

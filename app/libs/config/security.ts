@@ -1,6 +1,7 @@
 export interface SecurityConfig {
   rateLimiting: {
     enabled: boolean;
+    skipForLocalhost: boolean;
     general: {
       windowMs: number;
       maxRequests: number;
@@ -16,12 +17,14 @@ export interface SecurityConfig {
   };
   inputValidation: {
     enabled: boolean;
+    skipForLocalhost: boolean;
     maxStringLength: number;
     maxArrayLength: number;
     maxRequestSizeMB: number;
   };
   securityHeaders: {
     enabled: boolean;
+    skipForLocalhost: boolean;
     csp: string;
     cors: {
       enabled: boolean;
@@ -32,6 +35,7 @@ export interface SecurityConfig {
     enabled: boolean;
     level: 'debug' | 'info' | 'warn' | 'error';
     securityEvents: boolean;
+    skipForLocalhost: boolean;
   };
 }
 
@@ -39,6 +43,7 @@ export interface SecurityConfig {
 const devConfig: SecurityConfig = {
   rateLimiting: {
     enabled: true,
+    skipForLocalhost: true,
     general: {
       windowMs: 60 * 1000,        // 1 minute
       maxRequests: 1000,           // More lenient in dev
@@ -54,12 +59,14 @@ const devConfig: SecurityConfig = {
   },
   inputValidation: {
     enabled: true,
+    skipForLocalhost: true,
     maxStringLength: 1000,
     maxArrayLength: 1000,
     maxRequestSizeMB: 10,
   },
   securityHeaders: {
     enabled: true,
+    skipForLocalhost: false,       // Keep security headers even for localhost
     csp: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;",
     cors: {
       enabled: true,
@@ -70,6 +77,7 @@ const devConfig: SecurityConfig = {
     enabled: true,
     level: 'debug',
     securityEvents: true,
+    skipForLocalhost: false,       // Keep logging for localhost in dev
   },
 };
 
@@ -77,6 +85,7 @@ const devConfig: SecurityConfig = {
 const prodConfig: SecurityConfig = {
   rateLimiting: {
     enabled: true,
+    skipForLocalhost: false,       // No bypass in production
     general: {
       windowMs: 60 * 1000,        // 1 minute
       maxRequests: 100,            // Stricter in production
@@ -92,12 +101,14 @@ const prodConfig: SecurityConfig = {
   },
   inputValidation: {
     enabled: true,
+    skipForLocalhost: false,       // No bypass in production
     maxStringLength: 500,          // Stricter in production
     maxArrayLength: 500,
     maxRequestSizeMB: 5,
   },
   securityHeaders: {
     enabled: true,
+    skipForLocalhost: false,       // No bypass in production
     csp: "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; font-src 'self' data:;",
     cors: {
       enabled: true,
@@ -108,6 +119,7 @@ const prodConfig: SecurityConfig = {
     enabled: true,
     level: 'info',
     securityEvents: true,
+    skipForLocalhost: false,       // No bypass in production
   },
 };
 
@@ -122,24 +134,26 @@ export function getEnvOverrides(): Partial<SecurityConfig> {
   return {
     rateLimiting: {
       enabled: process.env.RATE_LIMITING_ENABLED === 'true',
+      skipForLocalhost: process.env.RATE_LIMITING_SKIP_LOCALHOST === 'true',
       general: {
-        windowMs: process.env.RATE_LIMIT_WINDOW_MS ? parseInt(process.env.RATE_LIMIT_WINDOW_MS) : undefined,
-        maxRequests: process.env.RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) : undefined,
+        windowMs: process.env.RATE_LIMIT_WINDOW_MS ? parseInt(process.env.RATE_LIMIT_WINDOW_MS) : 60000,
+        maxRequests: process.env.RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) : 100,
       },
       search: {
-        windowMs: process.env.SEARCH_RATE_LIMIT_WINDOW_MS ? parseInt(process.env.SEARCH_RATE_LIMIT_WINDOW_MS) : undefined,
-        maxRequests: process.env.SEARCH_RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.SEARCH_RATE_LIMIT_MAX_REQUESTS) : undefined,
+        windowMs: process.env.SEARCH_RATE_LIMIT_WINDOW_MS ? parseInt(process.env.SEARCH_RATE_LIMIT_WINDOW_MS) : 60000,
+        maxRequests: process.env.SEARCH_RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.SEARCH_RATE_LIMIT_MAX_REQUESTS) : 30,
       },
       download: {
-        windowMs: process.env.DOWNLOAD_RATE_LIMIT_WINDOW_MS ? parseInt(process.env.DOWNLOAD_RATE_LIMIT_WINDOW_MS) : undefined,
-        maxRequests: process.env.DOWNLOAD_RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.DOWNLOAD_RATE_LIMIT_MAX_REQUESTS) : undefined,
+        windowMs: process.env.DOWNLOAD_RATE_LIMIT_WINDOW_MS ? parseInt(process.env.DOWNLOAD_RATE_LIMIT_WINDOW_MS) : 60000,
+        maxRequests: process.env.DOWNLOAD_RATE_LIMIT_MAX_REQUESTS ? parseInt(process.env.DOWNLOAD_RATE_LIMIT_MAX_REQUESTS) : 10,
       },
     },
     inputValidation: {
       enabled: process.env.INPUT_VALIDATION_ENABLED === 'true',
-      maxStringLength: process.env.MAX_STRING_LENGTH ? parseInt(process.env.MAX_STRING_LENGTH) : undefined,
-      maxArrayLength: process.env.MAX_ARRAY_LENGTH ? parseInt(process.env.MAX_ARRAY_LENGTH) : undefined,
-      maxRequestSizeMB: process.env.MAX_REQUEST_SIZE_MB ? parseInt(process.env.MAX_REQUEST_SIZE_MB) : undefined,
+      skipForLocalhost: process.env.INPUT_VALIDATION_SKIP_LOCALHOST === 'true',
+      maxStringLength: process.env.MAX_STRING_LENGTH ? parseInt(process.env.MAX_STRING_LENGTH) : 1000,
+      maxArrayLength: process.env.MAX_ARRAY_LENGTH ? parseInt(process.env.MAX_ARRAY_LENGTH) : 1000,
+      maxRequestSizeMB: process.env.MAX_REQUEST_SIZE_MB ? parseInt(process.env.MAX_REQUEST_SIZE_MB) : 10,
     },
   };
 }
