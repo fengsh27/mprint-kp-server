@@ -38,6 +38,10 @@ const POPULATION_LABELS: Record<string, string> = {
 const POPULATION_ORDER = ['pregnancy', 'postpartum', 'ped01', 'ped112', 'ped1218'];
 const MIN_PLOT_HEIGHT = 400;
 const MAX_PLOT_HEIGHT = 800;
+const EXTRA_MAX_PLOT_HEIGHT = 1000;
+const EXTRA_EXTRA_MAX_PLOT_HEIGHT = 1500;
+const EXTRA_EXTRA_EXTRA_MAX_PLOT_HEIGHT = 2000;
+const MAX_PLOT_WIDTH = 1800;
 
 export default function DrugClassTab() {
   const [heatmapType, setHeatmapType] = useState<HeatmapType>('drugs');
@@ -116,21 +120,21 @@ export default function DrugClassTab() {
     };
   }, [data, heatmapType]);
 
-  const getHeatmapMinHeight = (heatmapData?: any[] | null) => {
-    if (heatmapData === null || 
-        heatmapData === undefined || 
-        heatmapData.length === 0 ||
-        heatmapData[0].z === undefined ||
-        heatmapData[0].z.length === 0) {
+  const getHeatmapMinHeight = (numItems: number) => {
+    if (numItems === 0) {
       return MIN_PLOT_HEIGHT;
     }
-    if (heatmapData[0].z.length <= 50) {
+    if (numItems <= 50) {
         return MIN_PLOT_HEIGHT;
-    } else /*if (heatmapData[0].z.length <= 100)*/ {
+    } else if (numItems <= 100) {
         return MAX_PLOT_HEIGHT;
-    } /*else {
-        return 1000;
-    }*/
+    } else if (numItems <= 200) {
+        return EXTRA_MAX_PLOT_HEIGHT;
+    } else if (numItems <= 500) {
+        return EXTRA_EXTRA_MAX_PLOT_HEIGHT;
+    } else {
+        return EXTRA_EXTRA_EXTRA_MAX_PLOT_HEIGHT;
+    }
   };
 
   const createHeatmapData = (populationData: HeatmapData[]) => {
@@ -267,7 +271,8 @@ export default function DrugClassTab() {
 
   const createHeatmapLayout = (population: string, numItems: number): any => {
     // Calculate fixed height based on number of items
-    const calculatedHeight = Math.max(MIN_PLOT_HEIGHT, Math.min(MAX_PLOT_HEIGHT, numItems * 12 + 150));
+    const minHeight = getHeatmapMinHeight(numItems);
+    const calculatedHeight = Math.max(minHeight, Math.min(minHeight, numItems * 12 + 150));
     console.log(`windowWidth: ${windowWidth}, calculatedHeight: ${calculatedHeight}`);
     
     return {
@@ -458,7 +463,7 @@ export default function DrugClassTab() {
                     displayModeBar: false,
                     responsive: true
                   }}
-                  style={{ width: '100%', minHeight: `${getHeatmapMinHeight(heatmapData)}px` }}
+                  style={{ width: '100%', minHeight: `${getHeatmapMinHeight(populationData.length)}px` }}
                   useResizeHandler={true}
                   onInitialized={(figure, graphDiv) => {
                     // Ensure plot resizes horizontally on initialization
