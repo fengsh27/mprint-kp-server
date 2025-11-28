@@ -9,6 +9,9 @@ export default {
       colors: {
         'mprint-header-bg-blue': '#CCE5F3',
       },
+      screens: {
+        '3xl': '1800px',
+      },
     },
   },
 }

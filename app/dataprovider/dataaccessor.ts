@@ -47,4 +47,17 @@ export const daGetStudy = (pmids: PmidRow[], opts?: { signal?: AbortSignal }) =>
 export const daPostTest = (opts?: { signal?: AbortSignal }) =>
   api.post<unknown>("/api/test", undefined, opts);
 
+export const daGetDrugClass = (
+  heatmapType: 'drugs' | 'level1' | 'level2' | 'level3' = 'drugs',
+  population?: string,
+  opts?: { signal?: AbortSignal }
+) => {
+  const params = new URLSearchParams();
+  params.set("type", heatmapType);
+  if (population) params.set("population", population);
+  const qs = params.toString();
+  const url = `/api/drug_class${qs ? `?${qs}` : ""}`;
+  return api.get<unknown>(url, opts);
+};
+
 
