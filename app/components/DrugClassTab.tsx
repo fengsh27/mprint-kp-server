@@ -20,6 +20,7 @@ interface HeatmapData {
   vc: number;
   fbnstp: number;
   biomarker: number;
+  count_all: number;
 }
 
 interface PopulationData {
@@ -63,6 +64,41 @@ export default function DrugClassTab() {
     fetchData();
   }, [heatmapType]);
 
+  // Handle window resize for responsive heatmaps
+  useEffect(() => {
+    let resizeTimer: NodeJS.Timeout;
+    
+    const handleResize = () => {
+      // Debounce resize events
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (typeof window !== 'undefined' && (window as any).Plotly) {
+          const plotElements = document.querySelectorAll('.js-plotly-plot');
+          plotElements.forEach((element) => {
+            try {
+              (window as any).Plotly.Plots.resize(element);
+            } catch (error) {
+              // Silently handle errors
+            }
+          });
+        }
+      }, 150);
+    };
+
+    window.addEventListener('resize', handleResize);
+    
+    // Initial resize after a short delay to ensure plots are rendered
+    const initialResize = setTimeout(() => {
+      handleResize();
+    }, 500);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimer);
+      clearTimeout(initialResize);
+    };
+  }, [data, heatmapType]);
+
   const createHeatmapData = (populationData: HeatmapData[]) => {
     if (!populationData || populationData.length === 0) {
       return null;
@@ -77,51 +113,49 @@ export default function DrugClassTab() {
     const fbnstpValues = populationData.map(d => d.fbnstp || 0);
     const biomarkerValues = populationData.map(d => d.biomarker || 0);
 
-    // Create data for PK, PE, CT heatmap
-    const pkpectOriginalZ: number[][] = [];
-    const pkpectZValues: number[][] = [];
-    
-    // Create data for VC, FBNSTP, Biomarker heatmap
-    const vcfbnstpBiomarkerOriginalZ: number[][] = [];
-    const vcfbnstpBiomarkerZValues: number[][] = [];
+    // Create combined data for all 6 columns
+    const originalZ: number[][] = [];
+    const zValues: number[][] = [];
     
     for (let i = 0; i < names.length; i++) {
-      // PK, PE, CT data
-      pkpectOriginalZ.push([pkValues[i], peValues[i], ctValues[i]]);
+      // Combine all 6 columns: PK, PE, CT, VC, FBNSTP, Biomarker
+      originalZ.push([
+        pkValues[i], 
+        peValues[i], 
+        ctValues[i], 
+        vcValues[i], 
+        fbnstpValues[i], 
+        biomarkerValues[i]
+      ]);
+      
       if (heatmapType === 'drugs') {
-        pkpectZValues.push([
+        zValues.push([
           Math.log10(pkValues[i] + 1),
           Math.log10(peValues[i] + 1),
-          Math.log10(ctValues[i] + 1)
-        ]);
-      } else {
-        pkpectZValues.push([pkValues[i], peValues[i], ctValues[i]]);
-      }
-
-      // VC, FBNSTP, Biomarker data
-      vcfbnstpBiomarkerOriginalZ.push([vcValues[i], fbnstpValues[i], biomarkerValues[i]]);
-      if (heatmapType === 'drugs') {
-        vcfbnstpBiomarkerZValues.push([
+          Math.log10(ctValues[i] + 1),
           Math.log10(vcValues[i] + 1),
           Math.log10(fbnstpValues[i] + 1),
           Math.log10(biomarkerValues[i] + 1)
         ]);
       } else {
-        vcfbnstpBiomarkerZValues.push([vcValues[i], fbnstpValues[i], biomarkerValues[i]]);
+        zValues.push([
+          pkValues[i], 
+          peValues[i], 
+          ctValues[i], 
+          vcValues[i], 
+          fbnstpValues[i], 
+          biomarkerValues[i]
+        ]);
       }
     }
 
-    // Find max values for each heatmap's color scale
-    const maxPkpectZValue = Math.max(...pkpectZValues.flat(), 0.1);
-    const maxVcfbnstpBiomarkerZValue = Math.max(...vcfbnstpBiomarkerZValues.flat(), 0.1);
+    // Find max value for color scale
+    const maxZValue = Math.max(...zValues.flat(), 0.1);
     
-    // Find max actual values (for colorbar labels when using log scale)
-    const maxPkpectActualValue = heatmapType === 'drugs' 
-      ? Math.max(...pkValues, ...peValues, ...ctValues, 1)
-      : maxPkpectZValue;
-    const maxVcfbnstpBiomarkerActualValue = heatmapType === 'drugs'
-      ? Math.max(...vcValues, ...fbnstpValues, ...biomarkerValues, 1)
-      : maxVcfbnstpBiomarkerZValue;
+    // Find max actual value (for colorbar labels when using log scale)
+    const maxActualValue = heatmapType === 'drugs' 
+      ? Math.max(...pkValues, ...peValues, ...ctValues, ...vcValues, ...fbnstpValues, ...biomarkerValues, 1)
+      : maxZValue;
 
     // Helper function to generate colorbar ticks for log scale
     const generateLogColorbarTicks = (maxLogValue: number, maxActualValue: number) => {
@@ -159,48 +193,14 @@ export default function DrugClassTab() {
       return { tickvals: tickVals, ticktext: tickTexts };
     };
 
-    const pkpectColorbarTicks = generateLogColorbarTicks(maxPkpectZValue, maxPkpectActualValue);
-    const vcfbnstpBiomarkerColorbarTicks = generateLogColorbarTicks(maxVcfbnstpBiomarkerZValue, maxVcfbnstpBiomarkerActualValue);
+    const colorbarTicks = generateLogColorbarTicks(maxZValue, maxActualValue);
 
-    // Create heatmap trace for PK, PE, CT
-    const pkpectTrace: any = {
-      z: pkpectZValues,
-      text: pkpectOriginalZ,
+    // Create single heatmap trace with all 6 columns
+    const trace: any = {
+      z: zValues,
+      text: originalZ,
       texttemplate: '', // Hide text, we'll use hover only
-      x: ['PK', 'PE', 'CT'],
-      y: names,
-      type: 'heatmap' as const,
-      colorscale: [
-        [0, '#f5f5f5'],
-        [0.01, '#e0e0e0'],
-        [0.1, '#bdbdbd'],
-        [0.3, '#9e9e9e'],
-        [0.5, '#757575'],
-        [0.7, '#424242'],
-        [0.9, '#212121'],
-        [1, '#000000']
-      ],
-      showscale: true,
-      colorbar: {
-        title: 'Publications (log scale)',
-        titleside: 'right' as const,
-        titlefont: { size: 12 },
-        ...(pkpectColorbarTicks ? {
-          tickvals: pkpectColorbarTicks.tickvals,
-          ticktext: pkpectColorbarTicks.ticktext
-        } : {})
-      },
-      hovertemplate: '<b>%{y}</b><br>%{x}: %{text}<extra></extra>',
-      zmin: 0,
-      zmax: maxPkpectZValue
-    };
-
-    // Create heatmap trace for VC, FBNSTP, Biomarker
-    const vcfbnstpBiomarkerTrace: any = {
-      z: vcfbnstpBiomarkerZValues,
-      text: vcfbnstpBiomarkerOriginalZ,
-      texttemplate: '', // Hide text, we'll use hover only
-      x: ['VC', 'FBNSTP', 'Biomarker'],
+      x: ['PK', 'PE', 'CT', 'VC', 'FBNSTP', 'Biomarker'],
       y: names,
       type: 'heatmap' as const,
       colorscale: [
@@ -218,35 +218,35 @@ export default function DrugClassTab() {
         title: heatmapType === 'drugs' ? 'Publications (log scale)' : 'Publications',
         titleside: 'right' as const,
         titlefont: { size: 12 },
-        ...(vcfbnstpBiomarkerColorbarTicks ? {
-          tickvals: vcfbnstpBiomarkerColorbarTicks.tickvals,
-          ticktext: vcfbnstpBiomarkerColorbarTicks.ticktext
+        ...(colorbarTicks ? {
+          tickvals: colorbarTicks.tickvals,
+          ticktext: colorbarTicks.ticktext
         } : {})
       },
       hovertemplate: '<b>%{y}</b><br>%{x}: %{text}<extra></extra>',
       zmin: 0,
-      zmax: maxVcfbnstpBiomarkerZValue
+      zmax: maxZValue
     };
 
-    return {
-      pkpect: [pkpectTrace],
-      vcfbnstpBiomarker: [vcfbnstpBiomarkerTrace]
-    };
+    return [trace];
   };
 
   const createHeatmapLayout = (population: string, numItems: number): any => {
+    // Calculate fixed height based on number of items
+    const calculatedHeight = Math.max(400, Math.min(1000, numItems * 12 + 150));
+    
     return {
       xaxis: {
         title: '',
         side: 'bottom' as const,
         tickfont: { size: 12 },
-        fixedrange: true
+        fixedrange: false // Allow horizontal responsive behavior
       },
       yaxis: {
         title: '',
         tickfont: { size: 8 },
         automargin: true,
-        fixedrange: true,
+        fixedrange: true, // Keep y-axis fixed (no vertical resize)
         tickmode: 'linear' as const,
         tick0: 0,
         dtick: 1
@@ -254,8 +254,9 @@ export default function DrugClassTab() {
       margin: { l: 200, r: 80, t: 50, b: 40 },
       plot_bgcolor: 'rgba(0,0,0,0)',
       paper_bgcolor: 'rgba(0,0,0,0)',
-      height: Math.max(400, Math.min(1000, numItems * 12 + 150)),
-      autosize: true
+      height: calculatedHeight,
+      autosize: false, // Disable autosize to keep height fixed
+      width: undefined // Let width be responsive
     };
   };
 
@@ -280,22 +281,30 @@ export default function DrugClassTab() {
       {/* Heatmap Type Selector */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
         <label className="block text-sm font-medium text-gray-700 mb-3">
-          Select Heatmap Type:
+          Select Heatmap by Drug Classification Level:
         </label>
         <div className="flex flex-wrap gap-3">
-          {(['drugs', 'level1', 'level2', 'level3'] as HeatmapType[]).map((type) => (
-            <button
-              key={type}
-              onClick={() => setHeatmapType(type)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                heatmapType === type
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {type === 'drugs' ? 'Drugs' : `Level ${type.slice(-1)}`}
-            </button>
-          ))}
+          {(['drugs', 'level1', 'level2', 'level3'] as HeatmapType[]).map((type) => {
+            const labels: Record<HeatmapType, string> = {
+              drugs: 'Individual Drugs',
+              level1: 'Drug Class Level 1',
+              level2: 'Drug Class Level 2',
+              level3: 'Drug Class Level 3'
+            };
+            return (
+              <button
+                key={type}
+                onClick={() => setHeatmapType(type)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  heatmapType === type
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {labels[type]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -342,6 +351,14 @@ export default function DrugClassTab() {
         {POPULATION_ORDER.map((population) => {
           let populationData = data[population] || [];
           
+          // Sort by count_all in ascending order (lowest first) so when displayed, highest will be at top
+          // Plotly displays first row at bottom, so we want lowest first in array to show highest at top
+          populationData = [...populationData].sort((a, b) => {
+            const countA = a.count_all || 0;
+            const countB = b.count_all || 0;
+            return countA - countB; // Ascending order (lowest first)
+          });
+          
           // Filter and limit data for drugs heatmap
           if (heatmapType === 'drugs') {
             // Filter by search query
@@ -352,11 +369,14 @@ export default function DrugClassTab() {
               );
             }
             
-            // Apply limit (data is already sorted by total publications from API)
+            // Apply limit (data is sorted ascending, so take last N items which are highest)
             if (limit !== null && limit > 0) {
-              populationData = populationData.slice(0, limit);
+              populationData = populationData.slice(-limit);
             }
           }
+          
+          // Reverse so highest values are at the end of array (will display at top of heatmap)
+          // populationData = [...populationData].reverse();
           
           const heatmapData = createHeatmapData(populationData);
           
@@ -389,41 +409,26 @@ export default function DrugClassTab() {
                 )}
               </div>
               
-              {/* Heatmaps in one row */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* PK, PE, CT Heatmap */}
-                <div>
-                  <h4 className="text-md font-medium text-gray-700 mb-3">PK, PE, CT</h4>
-                  <div className="flex-1 min-h-0">
-                    <Plot
-                      data={heatmapData.pkpect}
-                      layout={createHeatmapLayout(population, populationData.length)}
-                      config={{
-                        displayModeBar: false,
-                        responsive: true
-                      }}
-                      style={{ width: '100%', height: '100%', minHeight: '400px' }}
-                      useResizeHandler={true}
-                    />
-                  </div>
-                </div>
-
-                {/* VC, FBNSTP, Biomarker Heatmap */}
-                <div>
-                  <h4 className="text-md font-medium text-gray-700 mb-3">VC, FBNSTP, Biomarker</h4>
-                  <div className="flex-1 min-h-0">
-                    <Plot
-                      data={heatmapData.vcfbnstpBiomarker}
-                      layout={createHeatmapLayout(population, populationData.length)}
-                      config={{
-                        displayModeBar: false,
-                        responsive: true
-                      }}
-                      style={{ width: '100%', height: '100%', minHeight: '400px' }}
-                      useResizeHandler={true}
-                    />
-                  </div>
-                </div>
+              {/* Combined Heatmap with all 6 columns */}
+              <div className="flex-1 min-h-0 w-full" style={{ position: 'relative' }}>
+                <Plot
+                  data={heatmapData}
+                  layout={createHeatmapLayout(population, populationData.length)}
+                  config={{
+                    displayModeBar: false,
+                    responsive: true
+                  }}
+                  style={{ width: '100%', minHeight: '400px' }}
+                  useResizeHandler={true}
+                  onInitialized={(figure, graphDiv) => {
+                    // Ensure plot resizes horizontally on initialization
+                    if (typeof window !== 'undefined' && (window as any).Plotly) {
+                      setTimeout(() => {
+                        (window as any).Plotly.Plots.resize(graphDiv);
+                      }, 100);
+                    }
+                  }}
+                />
               </div>
             </div>
           );

@@ -52,13 +52,13 @@ export async function GET(req: NextRequest) {
               COALESCE(count_ct, 0) as ct,
               COALESCE(count_vc, 0) as vc,
               COALESCE(count_fbnstp, 0) as fbnstp,
-              COALESCE(count_biomarker, 0) as biomarker
+              COALESCE(count_biomarker, 0) as biomarker,
+              COALESCE(count_all, 0) as count_all
             FROM ${pop}
             WHERE GENNME_manual IS NOT NULL AND GENNME_manual != ''
               AND (COALESCE(count_pk, 0) + COALESCE(count_pe, 0) + COALESCE(count_ct, 0) + 
                    COALESCE(count_vc, 0) + COALESCE(count_fbnstp, 0) + COALESCE(count_biomarker, 0)) > 0
-            ORDER BY (COALESCE(count_pk, 0) + COALESCE(count_pe, 0) + COALESCE(count_ct, 0) + 
-                      COALESCE(count_vc, 0) + COALESCE(count_fbnstp, 0) + COALESCE(count_biomarker, 0)) DESC, GENNME_manual
+            ORDER BY COALESCE(count_all, 0) DESC, GENNME_manual
           `;
         } else if (heatmapType === 'level1') {
           query = `
@@ -69,15 +69,15 @@ export async function GET(req: NextRequest) {
               SUM(COALESCE(count_ct, 0)) as ct,
               SUM(COALESCE(count_vc, 0)) as vc,
               SUM(COALESCE(count_fbnstp, 0)) as fbnstp,
-              SUM(COALESCE(count_biomarker, 0)) as biomarker
+              SUM(COALESCE(count_biomarker, 0)) as biomarker,
+              SUM(COALESCE(count_all, 0)) as count_all
             FROM ${pop}
             CROSS JOIN json_each(level1)
             WHERE level1 IS NOT NULL AND level1 != 'null' AND level1 != ''
             GROUP BY json_each.value
             HAVING (SUM(COALESCE(count_pk, 0)) + SUM(COALESCE(count_pe, 0)) + SUM(COALESCE(count_ct, 0)) + 
                     SUM(COALESCE(count_vc, 0)) + SUM(COALESCE(count_fbnstp, 0)) + SUM(COALESCE(count_biomarker, 0))) > 0
-            ORDER BY (SUM(COALESCE(count_pk, 0)) + SUM(COALESCE(count_pe, 0)) + SUM(COALESCE(count_ct, 0)) + 
-                      SUM(COALESCE(count_vc, 0)) + SUM(COALESCE(count_fbnstp, 0)) + SUM(COALESCE(count_biomarker, 0))) DESC, json_each.value
+            ORDER BY SUM(COALESCE(count_all, 0)) DESC, json_each.value
           `;
         } else if (heatmapType === 'level2') {
           query = `
@@ -88,15 +88,15 @@ export async function GET(req: NextRequest) {
               SUM(COALESCE(count_ct, 0)) as ct,
               SUM(COALESCE(count_vc, 0)) as vc,
               SUM(COALESCE(count_fbnstp, 0)) as fbnstp,
-              SUM(COALESCE(count_biomarker, 0)) as biomarker
+              SUM(COALESCE(count_biomarker, 0)) as biomarker,
+              SUM(COALESCE(count_all, 0)) as count_all
             FROM ${pop}
             CROSS JOIN json_each(level2)
             WHERE level2 IS NOT NULL AND level2 != 'null' AND level2 != ''
             GROUP BY json_each.value
             HAVING (SUM(COALESCE(count_pk, 0)) + SUM(COALESCE(count_pe, 0)) + SUM(COALESCE(count_ct, 0)) + 
                     SUM(COALESCE(count_vc, 0)) + SUM(COALESCE(count_fbnstp, 0)) + SUM(COALESCE(count_biomarker, 0))) > 0
-            ORDER BY (SUM(COALESCE(count_pk, 0)) + SUM(COALESCE(count_pe, 0)) + SUM(COALESCE(count_ct, 0)) + 
-                      SUM(COALESCE(count_vc, 0)) + SUM(COALESCE(count_fbnstp, 0)) + SUM(COALESCE(count_biomarker, 0))) DESC, json_each.value
+            ORDER BY SUM(COALESCE(count_all, 0)) DESC, json_each.value
           `;
         } else if (heatmapType === 'level3') {
           query = `
@@ -107,21 +107,21 @@ export async function GET(req: NextRequest) {
               SUM(COALESCE(count_ct, 0)) as ct,
               SUM(COALESCE(count_vc, 0)) as vc,
               SUM(COALESCE(count_fbnstp, 0)) as fbnstp,
-              SUM(COALESCE(count_biomarker, 0)) as biomarker
+              SUM(COALESCE(count_biomarker, 0)) as biomarker,
+              SUM(COALESCE(count_all, 0)) as count_all
             FROM ${pop}
             CROSS JOIN json_each(level3)
             WHERE level3 IS NOT NULL AND level3 != 'null' AND level3 != ''
             GROUP BY json_each.value
             HAVING (SUM(COALESCE(count_pk, 0)) + SUM(COALESCE(count_pe, 0)) + SUM(COALESCE(count_ct, 0)) + 
                     SUM(COALESCE(count_vc, 0)) + SUM(COALESCE(count_fbnstp, 0)) + SUM(COALESCE(count_biomarker, 0))) > 0
-            ORDER BY (SUM(COALESCE(count_pk, 0)) + SUM(COALESCE(count_pe, 0)) + SUM(COALESCE(count_ct, 0)) + 
-                      SUM(COALESCE(count_vc, 0)) + SUM(COALESCE(count_fbnstp, 0)) + SUM(COALESCE(count_biomarker, 0))) DESC, json_each.value
+            ORDER BY SUM(COALESCE(count_all, 0)) DESC, json_each.value
           `;
         }
 
         if (query) {
           const stmt = db.prepare(query);
-          const rows = stmt.all() as Array<{ name: string; pk: number; pe: number; ct: number; vc: number; fbnstp: number; biomarker: number }>;
+          const rows = stmt.all() as Array<{ name: string; pk: number; pe: number; ct: number; vc: number; fbnstp: number; biomarker: number; count_all: number }>;
           result[pop] = rows;
         }
       }
