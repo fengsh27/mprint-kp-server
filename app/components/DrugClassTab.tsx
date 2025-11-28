@@ -49,7 +49,7 @@ export default function DrugClassTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [limit, setLimit] = useState<number | null>(200); // Default to top 200
+  const [limit, setLimit] = useState<number | null>(100); // Default to top 100
   const [windowWidth, setWindowWidth] = useState(0);
 
   useEffect(() => {
@@ -427,7 +427,7 @@ export default function DrugClassTab() {
           
           if (!heatmapData) {
             return (
-              <div key={population} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+              <div key={population} className="bg-white border border-gray-200 rounded-lg p-6 shadow-lg">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   {POPULATION_LABELS[population] || population}
                 </h3>
@@ -442,7 +442,7 @@ export default function DrugClassTab() {
           const displayedCount = populationData.length;
           
           return (
-            <div key={population} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <div key={population} className="bg-white border border-gray-200 rounded-lg p-6 shadow-lg">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">
                   {POPULATION_LABELS[population] || population}
