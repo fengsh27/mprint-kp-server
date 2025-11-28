@@ -11,6 +11,7 @@ import VirtualizedSelect from './VirtualizedSelect';
 import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
 import PublicationTab from './PublicationTab';
+import DrugClassTab from './DrugClassTab';
 
 import {
   daGetConcepts, 
@@ -709,6 +710,14 @@ export default function Home() {
                 <span>Overview</span>
               </Tabs.Trigger>
 
+              <Tabs.Trigger
+                value="drugclass"
+                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>Drug Class</span>
+              </Tabs.Trigger>
+
           {hasDrugSearched && (
             <Tabs.Trigger
               value="drug"
@@ -747,6 +756,19 @@ export default function Home() {
                   clinicalChartData={clinicalChartData}
                   chartLayout={chartLayout}
                 />
+              )}
+            </Tabs.Content>
+
+            <Tabs.Content 
+              value="drugclass" 
+              className="outline-none animate-in fade-in-0 slide-in-from-left-1 duration-300"
+            >
+              {isTabSwitching && activeTab !== 'drugclass' ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <DrugClassTab />
               )}
             </Tabs.Content>
             
