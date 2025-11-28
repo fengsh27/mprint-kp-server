@@ -36,6 +36,8 @@ const POPULATION_LABELS: Record<string, string> = {
 };
 
 const POPULATION_ORDER = ['pregnancy', 'postpartum', 'ped01', 'ped112', 'ped1218'];
+const MIN_PLOT_HEIGHT = 400;
+const MAX_PLOT_HEIGHT = 800;
 
 export default function DrugClassTab() {
   const [heatmapType, setHeatmapType] = useState<HeatmapType>('drugs');
@@ -44,6 +46,7 @@ export default function DrugClassTab() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [limit, setLimit] = useState<number | null>(200); // Default to top 200
+  const [windowWidth, setWindowWidth] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -63,6 +66,20 @@ export default function DrugClassTab() {
 
     fetchData();
   }, [heatmapType]);
+
+  // Track window width for responsive grid
+  useEffect(() => {
+    const updateWindowWidth = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    // Set initial width
+    if (typeof window !== 'undefined') {
+      updateWindowWidth();
+      window.addEventListener('resize', updateWindowWidth);
+      return () => window.removeEventListener('resize', updateWindowWidth);
+    }
+  }, []);
 
   // Handle window resize for responsive heatmaps
   useEffect(() => {
@@ -98,6 +115,23 @@ export default function DrugClassTab() {
       clearTimeout(initialResize);
     };
   }, [data, heatmapType]);
+
+  const getHeatmapMinHeight = (heatmapData?: any[] | null) => {
+    if (heatmapData === null || 
+        heatmapData === undefined || 
+        heatmapData.length === 0 ||
+        heatmapData[0].z === undefined ||
+        heatmapData[0].z.length === 0) {
+      return MIN_PLOT_HEIGHT;
+    }
+    if (heatmapData[0].z.length <= 50) {
+        return MIN_PLOT_HEIGHT;
+    } else /*if (heatmapData[0].z.length <= 100)*/ {
+        return MAX_PLOT_HEIGHT;
+    } /*else {
+        return 1000;
+    }*/
+  };
 
   const createHeatmapData = (populationData: HeatmapData[]) => {
     if (!populationData || populationData.length === 0) {
@@ -233,7 +267,8 @@ export default function DrugClassTab() {
 
   const createHeatmapLayout = (population: string, numItems: number): any => {
     // Calculate fixed height based on number of items
-    const calculatedHeight = Math.max(400, Math.min(1000, numItems * 12 + 150));
+    const calculatedHeight = Math.max(MIN_PLOT_HEIGHT, Math.min(MAX_PLOT_HEIGHT, numItems * 12 + 150));
+    console.log(`windowWidth: ${windowWidth}, calculatedHeight: ${calculatedHeight}`);
     
     return {
       xaxis: {
@@ -347,7 +382,12 @@ export default function DrugClassTab() {
       )}
 
       {/* Heatmaps */}
-      <div className="space-y-6">
+      <div 
+        className="grid gap-6" 
+        style={{
+          gridTemplateColumns: windowWidth >= 1800 ? 'repeat(2, minmax(0, 1fr))' : 'repeat(1, minmax(0, 1fr))'
+        } as React.CSSProperties}
+      >
         {POPULATION_ORDER.map((population) => {
           let populationData = data[population] || [];
           
@@ -418,7 +458,7 @@ export default function DrugClassTab() {
                     displayModeBar: false,
                     responsive: true
                   }}
-                  style={{ width: '100%', minHeight: '400px' }}
+                  style={{ width: '100%', minHeight: `${getHeatmapMinHeight(heatmapData)}px` }}
                   useResizeHandler={true}
                   onInitialized={(figure, graphDiv) => {
                     // Ensure plot resizes horizontally on initialization

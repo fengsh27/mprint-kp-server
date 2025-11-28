@@ -46,6 +46,9 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy data directory including drug_class.db
+COPY --from=builder --chown=nextjs:nodejs /app/data ./data
+
 USER nextjs
 
 EXPOSE 3000
