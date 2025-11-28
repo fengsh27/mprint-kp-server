@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.5](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.4...v0.1.5) (2025-11-28)
+
+
+### Features
+
+* implement drug class tab ([#6](https://github.com/fengsh27/mprint-kp-server/issues/6)) ([8f0ab26](https://github.com/fengsh27/mprint-kp-server/commit/8f0ab26a6f2787410fbd747e3bd98c21d9895191))
+
 ### [0.1.4](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.2...v0.1.4) (2025-08-29)
 
 
