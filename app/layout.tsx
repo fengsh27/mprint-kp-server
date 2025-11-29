@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mprint Silver Portal",
-  description: "Mprint Silver Portal",
+  title: "MPRINT Silver Portal",
+  description: "MPRINT Silver Portal",
   icons: {
     icon: '/images/favicon.png',
   },

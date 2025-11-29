@@ -316,43 +316,38 @@ export default function DrugClassTab() {
     );
   }
 
+  const heatmapTypeLabels: Record<HeatmapType, string> = {
+    drugs: 'Individual Drugs',
+    level1: 'Drug Class Level 1',
+    level2: 'Drug Class Level 2',
+    level3: 'Drug Class Level 3'
+  };
+
   return (
     <div className="space-y-6">
-      {/* Heatmap Type Selector */}
+      {/* Controls Row */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-        <label className="block text-sm font-medium text-gray-700 mb-3">
-          Select Heatmap by Drug Classification Level:
-        </label>
-        <div className="flex flex-wrap gap-3">
-          {(['drugs', 'level1', 'level2', 'level3'] as HeatmapType[]).map((type) => {
-            const labels: Record<HeatmapType, string> = {
-              drugs: 'Individual Drugs',
-              level1: 'Drug Class Level 1',
-              level2: 'Drug Class Level 2',
-              level3: 'Drug Class Level 3'
-            };
-            return (
-              <button
-                key={type}
-                onClick={() => setHeatmapType(type)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  heatmapType === type
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {labels[type]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Heatmap Type Dropdown */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Heatmap Type:
+            </label>
+            <select
+              value={heatmapType}
+              onChange={(e) => setHeatmapType(e.target.value as HeatmapType)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              {(['drugs', 'level1', 'level2', 'level3'] as HeatmapType[]).map((type) => (
+                <option key={type} value={type}>
+                  {heatmapTypeLabels[type]}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      {/* Search and Limit Controls - Only show for drugs */}
-      {heatmapType === 'drugs' && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Search Input */}
+          {/* Search Input - Only show for drugs */}
+          {heatmapType === 'drugs' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Search Drugs:
@@ -365,8 +360,10 @@ export default function DrugClassTab() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
+          )}
 
-            {/* Limit Selector */}
+          {/* Limit Selector - Only show for drugs */}
+          {heatmapType === 'drugs' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Show Top N Drugs:
@@ -382,9 +379,9 @@ export default function DrugClassTab() {
                 <option value="all">All Drugs</option>
               </select>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Heatmaps */}
       <div 
