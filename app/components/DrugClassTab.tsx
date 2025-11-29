@@ -43,7 +43,11 @@ const EXTRA_EXTRA_MAX_PLOT_HEIGHT = 1500;
 const EXTRA_EXTRA_EXTRA_MAX_PLOT_HEIGHT = 2000;
 const MAX_PLOT_WIDTH = 1800;
 
-export default function DrugClassTab() {
+interface DrugClassTabProps {
+  selectedDrugClass?: string;
+}
+
+export default function DrugClassTab({ selectedDrugClass }: DrugClassTabProps) {
   const [heatmapType, setHeatmapType] = useState<HeatmapType>('drugs');
   const [data, setData] = useState<PopulationData>({});
   const [loading, setLoading] = useState(true);
@@ -57,7 +61,9 @@ export default function DrugClassTab() {
       setLoading(true);
       setError(null);
       try {
-        const response = await daGetDrugClass(heatmapType);
+        // If selectedDrugClass is provided, always use 'drugs' type and filter by drug class
+        const typeToUse = selectedDrugClass ? 'drugs' : heatmapType;
+        const response = await daGetDrugClass(typeToUse, undefined, selectedDrugClass);
         const result = await response as PopulationData;
         setData(result);
       } catch (err: any) {
@@ -69,7 +75,7 @@ export default function DrugClassTab() {
     };
 
     fetchData();
-  }, [heatmapType]);
+  }, [heatmapType, selectedDrugClass]);
 
   // Track window width for responsive grid
   useEffect(() => {
@@ -325,29 +331,43 @@ export default function DrugClassTab() {
 
   return (
     <div className="space-y-6">
+      {/* Selected Drug Class Info */}
+      {selectedDrugClass && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-800">
+            <span className="font-semibold">Selected Drug Class:</span> {selectedDrugClass}
+          </p>
+          <p className="text-xs mt-1">
+            Showing heatmaps for all drugs with this drug class
+          </p>
+        </div>
+      )}
+
       {/* Controls Row */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Heatmap Type Dropdown */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Heatmap Type:
-            </label>
-            <select
-              value={heatmapType}
-              onChange={(e) => setHeatmapType(e.target.value as HeatmapType)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {(['drugs', 'level1', 'level2', 'level3'] as HeatmapType[]).map((type) => (
-                <option key={type} value={type}>
-                  {heatmapTypeLabels[type]}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Heatmap Type Dropdown - Only show if no drug class is selected */}
+          {!selectedDrugClass && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Heatmap Type:
+              </label>
+              <select
+                value={heatmapType}
+                onChange={(e) => setHeatmapType(e.target.value as HeatmapType)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {(['drugs', 'level1', 'level2', 'level3'] as HeatmapType[]).map((type) => (
+                  <option key={type} value={type}>
+                    {heatmapTypeLabels[type]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Search Input - Only show for drugs */}
-          {heatmapType === 'drugs' && (
+          {(heatmapType === 'drugs' || selectedDrugClass) && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Search Drugs:
@@ -363,7 +383,7 @@ export default function DrugClassTab() {
           )}
 
           {/* Limit Selector - Only show for drugs */}
-          {heatmapType === 'drugs' && (
+          {(heatmapType === 'drugs' || selectedDrugClass) && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Show Top N Drugs:
@@ -402,7 +422,7 @@ export default function DrugClassTab() {
           });
           
           // Filter and limit data for drugs heatmap
-          if (heatmapType === 'drugs') {
+          if (heatmapType === 'drugs' || selectedDrugClass) {
             // Filter by search query
             if (searchQuery.trim()) {
               const query = searchQuery.toLowerCase();

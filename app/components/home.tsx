@@ -8,6 +8,7 @@ import * as Tabs from '@radix-ui/react-tabs';
 import { useQueryState } from 'nuqs';
 import { useDebouncedCallback } from "use-debounce";
 import VirtualizedSelect from './VirtualizedSelect';
+import DrugClassSelect from './DrugClassSelect';
 import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
 import PublicationTab from './PublicationTab';
@@ -20,7 +21,8 @@ import {
   daGetOverallStudyType, 
   daGetPMIDs, 
   daGetStudy, 
-  daGetTypePopulation, 
+  daGetTypePopulation,
+  daGetDrugClassList,
 } from "../dataprovider/dataaccessor";
 import { 
   ConceptRow, 
@@ -140,6 +142,12 @@ export default function Home() {
   const [diseaseList, setDiseaseList] = useState<{TERM: string, des: string}[]>([]);
   const [selectedDrug, setSelectedDrug] = useState('');
   const [selectedDisease, setSelectedDisease] = useState('');
+  const [selectedDrugClass, setSelectedDrugClass] = useState('');
+  const [drugClassHierarchy, setDrugClassHierarchy] = useState<{level1: string[], level2: string[], level3: string[]}>({
+    level1: [],
+    level2: [],
+    level3: []
+  });
    
   const[queryDrug, setQueryDrug] = useQueryState('drug', { 
     defaultValue: '', 
@@ -147,7 +155,9 @@ export default function Home() {
   const [queryDisease, setQueryDisease] = useQueryState('disease', { 
     defaultValue: '', 
   });
-  
+  const [queryDrugClass, setQueryDrugClass] = useQueryState('drugClass', { 
+    defaultValue: '', 
+  });
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [hasDrugSearched, setHasDrugSearched] = useState(false);
@@ -223,9 +233,35 @@ export default function Home() {
     }
   }, [searchMode]);
 
+  // Auto-search when drug is selected in simple mode
+  useEffect(() => {
+    if (searchMode === 'simple' && selectedDrug) {
+      // Only trigger search if drug is actually selected (not on initial render)
+      setQueryDrug(selectedDrug);
+      setQueryDisease('');
+      handleTabChange("overview");
+      handleConceptChange(selectedDrug, '');
+    }
+  }, [selectedDrug, searchMode]);
+
+  // Load drug class hierarchy when drug class mode is selected
+  useEffect(() => {
+    if (searchMode === 'drugclass' && drugClassHierarchy.level1.length === 0) {
+      daGetDrugClassList().then((data: any) => {
+        setDrugClassHierarchy(data);
+      }).catch((error: any) => {
+        console.error('Error fetching drug class list:', error);
+      });
+    }
+  }, [searchMode]);
+
   // Auto-search when URL parameters are present on page load
   useEffect(() => {
-    if (isQueryStateValid(queryDrug) || isQueryStateValid(queryDisease)) {
+    if (
+      isQueryStateValid(queryDrug) || 
+      isQueryStateValid(queryDisease) || 
+      isQueryStateValid(queryDrugClass)
+    ) {
       // populate drug list and set selected drug to advanced if drug is selected
       daGetDrugList().then((data: any) => {
         const drugs = (data.druglist as Array<{name: string, type: string}>).filter(
@@ -362,8 +398,22 @@ export default function Home() {
     if (e.target.value === 'simple') {
       try {
         setSelectedDisease('');
+        setSelectedDrugClass('');
       } catch (error) {
-        console.warn('Error clearing disease selection:', error);        
+        console.warn('Error clearing selections:', error);        
+      }
+    } else if (e.target.value === 'advanced') {
+      try {
+        setSelectedDrugClass('');
+      } catch (error) {
+        console.warn('Error clearing drug class selection:', error);
+      }
+    } else if (e.target.value === 'drugclass') {
+      try {
+        setSelectedDrug('');
+        setSelectedDisease('');
+      } catch (error) {
+        console.warn('Error clearing drug/disease selections:', error);
       }
     }
   }
@@ -372,6 +422,7 @@ export default function Home() {
     try {
       setSelectedDrug('');
       setSelectedDisease('');
+      setSelectedDrugClass('');
       setQueryDrug('');
       setQueryDisease('');
       initializeOverview();
@@ -385,6 +436,13 @@ export default function Home() {
     setPublicationData([]);
     setHasDrugSearched(false);
     setActiveTab('overview');
+  }
+
+  function handleDrugClassChange(drugClass: string) {
+    setSelectedDrugClass(drugClass);
+    if (drugClass) {
+      setActiveTab('drugclass');
+    }
   }
 
   function handleDownload() {
@@ -454,7 +512,7 @@ export default function Home() {
             <Accordion.Root type="multiple" defaultValue={["search"]} className="space-y-4">
               {/* Search Section */}
               <Accordion.Item value="search" className="bg-white rounded-lg shadow-sm">
-              <Accordion.Trigger className="flex items-center justify-between w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+              <Accordion.Trigger className="group flex items-center justify-between w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
                 <div className="flex items-center space-x-2">
                   <Search className="w-5 h-5 text-gray-600" />
                   <span className="font-medium text-gray-900">Search</span>
@@ -486,51 +544,105 @@ export default function Home() {
                           name="searchMode"
                           value="advanced"
                           checked={searchMode === 'advanced'}
-                          onChange={(e) => setSearchMode(e.target.value)}
+                          onChange={handleSearchModeChange}
                           className="mr-2"
                         />
                         <span className="text-sm text-gray-700">Advanced</span>
                       </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="searchMode"
+                          value="drugclass"
+                          checked={searchMode === 'drugclass'}
+                          onChange={handleSearchModeChange}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">Drug Class</span>
+                      </label>
                     </div>
                   </div>
                   
-                  <div className="relative">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Drug Name:
-                    </label>
-                    <div className="absolute left-20 top-1 w-4 h-4" title="Select a drug to search" >
-                      <Info className="w-4 h-4 text-gray-400" />
-                    </div>
+                  {/* Drug Name Field - Only shown in Simple and Advanced modes */}
+                  {searchMode !== 'drugclass' && (
                     <div className="relative">
-                        <VirtualizedSelect
-                          value={selectedDrug}
-                          onValueChange={setSelectedDrug}
-                          placeholder="Select a drug"
-                          options={drugList.map(drug => ({ value: drug, label: drug }))}
-                          searchPlaceholder="Search drugs..."
-                          maxHeight={300}
-                          itemHeight={40}
-                        />
-                      
-                      {selectedDrug && (
-                        <button
-                          onClick={() => {
-                            try {
-                              setSelectedDrug('');
-                            } catch (error) {
-                              console.warn('Error clearing drug selection:', error);
-                            }
-                          }}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                          title="Clear selection"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Drug Name:
+                      </label>
+                      <div className="absolute left-20 top-1 w-4 h-4" title="Select a drug to search" >
+                        <Info className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <div className="relative">
+                          <VirtualizedSelect
+                            value={selectedDrug}
+                            onValueChange={setSelectedDrug}
+                            placeholder="Select a drug"
+                            options={drugList.map(drug => ({ value: drug, label: drug }))}
+                            searchPlaceholder="Search drugs..."
+                            maxHeight={300}
+                            itemHeight={40}
+                          />
+                        
+                        {selectedDrug && (
+                          <button
+                            onClick={() => {
+                              try {
+                                setSelectedDrug('');
+                              } catch (error) {
+                                console.warn('Error clearing drug selection:', error);
+                              }
+                            }}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                            title="Clear selection"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  
+                  {/* Drug Class Field - Only shown in Drug Class mode */}
+                  {searchMode === 'drugclass' && (
+                    <div className="relative">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Drug Class:
+                      </label>
+                      <div className="absolute left-20 top-1 w-4 h-4" title="Select a drug class to search" >
+                        <Info className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <div className="relative">
+                        <DrugClassSelect
+                          value={selectedDrugClass}
+                          onValueChange={handleDrugClassChange}
+                          placeholder="Select a drug class"
+                          hierarchy={drugClassHierarchy}
+                          searchPlaceholder="Search drug classes..."
+                        />
+                        
+                        {selectedDrugClass && (
+                          <button
+                            onClick={() => {
+                              try {
+                                setSelectedDrugClass('');
+                                setActiveTab('overview');
+                              } catch (error) {
+                                console.warn('Error clearing drug class selection:', error);
+                              }
+                            }}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                            title="Clear selection"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Disease Name Field - Only shown in Advanced mode */}
                   {searchMode === 'advanced' && (
@@ -578,14 +690,16 @@ export default function Home() {
                   )}
                   
                   <div className="flex space-x-2">
+                    {searchMode !== 'simple' && (
+                      <button 
+                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                        onClick={handleSearch}
+                      >
+                        Search
+                      </button>
+                    )}
                     <button 
-                      className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-                      onClick={handleSearch}
-                    >
-                      Search
-                    </button>
-                    <button 
-                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                      className={`${searchMode === 'simple' ? 'flex-1' : ''} px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors`}
                       onClick={clearAllSearch}
                     >
                       Clear
@@ -597,7 +711,7 @@ export default function Home() {
 
             {/* Download Data Section */}
             <Accordion.Item value="download" className="bg-white rounded-lg shadow-sm">
-              <Accordion.Trigger className="flex items-center justify-between w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
+              <Accordion.Trigger className="group flex items-center justify-between w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
                 <div className="flex items-center space-x-2">
                   <Download className="w-5 h-5 text-gray-600" />
                   <span className="text-gray-900 font-medium">Download Data</span>
@@ -710,13 +824,15 @@ export default function Home() {
                 <span>Overview</span>
               </Tabs.Trigger>
 
-              <Tabs.Trigger
-                value="drugclass"
-                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              >
-                <BarChart3 className="w-4 h-4" />
-                <span>Drug & Publication</span>
-              </Tabs.Trigger>
+              {selectedDrugClass && (
+                <Tabs.Trigger
+                  value="drugclass"
+                  className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Drug & Publication</span>
+                </Tabs.Trigger>
+              )}
 
           {hasDrugSearched && (
             <Tabs.Trigger
@@ -759,18 +875,20 @@ export default function Home() {
               )}
             </Tabs.Content>
 
-            <Tabs.Content 
-              value="drugclass" 
-              className="outline-none animate-in fade-in-0 slide-in-from-left-1 duration-300"
-            >
-              {isTabSwitching && activeTab !== 'drugclass' ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                </div>
-              ) : (
-                <DrugClassTab />
-              )}
-            </Tabs.Content>
+            {selectedDrugClass && (
+              <Tabs.Content 
+                value="drugclass" 
+                className="outline-none animate-in fade-in-0 slide-in-from-left-1 duration-300"
+              >
+                {isTabSwitching && activeTab !== 'drugclass' ? (
+                  <div className="flex items-center justify-center h-32">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : (
+                  <DrugClassTab selectedDrugClass={selectedDrugClass} />
+                )}
+              </Tabs.Content>
+            )}
             
           {hasDrugSearched && (
             <Tabs.Content 

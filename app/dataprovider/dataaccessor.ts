@@ -50,14 +50,19 @@ export const daPostTest = (opts?: { signal?: AbortSignal }) =>
 export const daGetDrugClass = (
   heatmapType: 'drugs' | 'level1' | 'level2' | 'level3' = 'drugs',
   population?: string,
+  drugClass?: string,
   opts?: { signal?: AbortSignal }
 ) => {
   const params = new URLSearchParams();
   params.set("type", heatmapType);
   if (population) params.set("population", population);
+  if (drugClass) params.set("drugClass", drugClass);
   const qs = params.toString();
   const url = `/api/drug_class${qs ? `?${qs}` : ""}`;
   return api.get<unknown>(url, opts);
 };
+
+export const daGetDrugClassList = (opts?: { signal?: AbortSignal }) =>
+  api.get<unknown>("/api/drug_class/list", opts);
 
 

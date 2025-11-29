@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const heatmapType = searchParams.get('type') || 'drugs'; // 'drugs', 'level1', 'level2', 'level3'
     const population = searchParams.get('population'); // 'pregnancy', 'postpartum', 'ped01', 'ped112', 'ped1218'
+    const drugClass = searchParams.get('drugClass'); // Filter drugs by specific drug class
 
     const db = new Database(DB_PATH, { readonly: true });
 
@@ -44,22 +45,56 @@ export async function GET(req: NextRequest) {
         let groupBy = '';
 
         if (heatmapType === 'drugs') {
-          query = `
-            SELECT 
-              GENNME_manual as name,
-              COALESCE(count_pk, 0) as pk,
-              COALESCE(count_pe, 0) as pe,
-              COALESCE(count_ct, 0) as ct,
-              COALESCE(count_vc, 0) as vc,
-              COALESCE(count_fbnstp, 0) as fbnstp,
-              COALESCE(count_biomarker, 0) as biomarker,
-              COALESCE(count_all, 0) as count_all
-            FROM ${pop}
-            WHERE GENNME_manual IS NOT NULL AND GENNME_manual != ''
-              AND (COALESCE(count_pk, 0) + COALESCE(count_pe, 0) + COALESCE(count_ct, 0) + 
-                   COALESCE(count_vc, 0) + COALESCE(count_fbnstp, 0) + COALESCE(count_biomarker, 0)) > 0
-            ORDER BY COALESCE(count_all, 0) DESC, GENNME_manual
-          `;
+          // Filter by drug class if provided - use a subquery approach
+          if (drugClass) {
+            query = `
+              SELECT DISTINCT
+                t.GENNME_manual as name,
+                COALESCE(t.count_pk, 0) as pk,
+                COALESCE(t.count_pe, 0) as pe,
+                COALESCE(t.count_ct, 0) as ct,
+                COALESCE(t.count_vc, 0) as vc,
+                COALESCE(t.count_fbnstp, 0) as fbnstp,
+                COALESCE(t.count_biomarker, 0) as biomarker,
+                COALESCE(t.count_all, 0) as count_all
+              FROM ${pop} t
+              WHERE t.GENNME_manual IS NOT NULL AND t.GENNME_manual != ''
+                AND (COALESCE(t.count_pk, 0) + COALESCE(t.count_pe, 0) + COALESCE(t.count_ct, 0) + 
+                     COALESCE(t.count_vc, 0) + COALESCE(t.count_fbnstp, 0) + COALESCE(t.count_biomarker, 0)) > 0
+                AND (
+                  EXISTS (
+                    SELECT 1 FROM json_each(t.level1) 
+                    WHERE json_each.value = ?
+                  )
+                  OR EXISTS (
+                    SELECT 1 FROM json_each(t.level2) 
+                    WHERE json_each.value = ?
+                  )
+                  OR EXISTS (
+                    SELECT 1 FROM json_each(t.level3) 
+                    WHERE json_each.value = ?
+                  )
+                )
+              ORDER BY COALESCE(t.count_all, 0) DESC, t.GENNME_manual
+            `;
+          } else {
+            query = `
+              SELECT 
+                GENNME_manual as name,
+                COALESCE(count_pk, 0) as pk,
+                COALESCE(count_pe, 0) as pe,
+                COALESCE(count_ct, 0) as ct,
+                COALESCE(count_vc, 0) as vc,
+                COALESCE(count_fbnstp, 0) as fbnstp,
+                COALESCE(count_biomarker, 0) as biomarker,
+                COALESCE(count_all, 0) as count_all
+              FROM ${pop}
+              WHERE GENNME_manual IS NOT NULL AND GENNME_manual != ''
+                AND (COALESCE(count_pk, 0) + COALESCE(count_pe, 0) + COALESCE(count_ct, 0) + 
+                     COALESCE(count_vc, 0) + COALESCE(count_fbnstp, 0) + COALESCE(count_biomarker, 0)) > 0
+              ORDER BY COALESCE(count_all, 0) DESC, GENNME_manual
+            `;
+          }
         } else if (heatmapType === 'level1') {
           query = `
             SELECT 
@@ -120,9 +155,16 @@ export async function GET(req: NextRequest) {
         }
 
         if (query) {
-          const stmt = db.prepare(query);
-          const rows = stmt.all() as Array<{ name: string; pk: number; pe: number; ct: number; vc: number; fbnstp: number; biomarker: number; count_all: number }>;
-          result[pop] = rows;
+          let stmt;
+          if (drugClass && heatmapType === 'drugs') {
+            stmt = db.prepare(query);
+            const rows = stmt.all(drugClass, drugClass, drugClass) as Array<{ name: string; pk: number; pe: number; ct: number; vc: number; fbnstp: number; biomarker: number; count_all: number }>;
+            result[pop] = rows;
+          } else {
+            stmt = db.prepare(query);
+            const rows = stmt.all() as Array<{ name: string; pk: number; pe: number; ct: number; vc: number; fbnstp: number; biomarker: number; count_all: number }>;
+            result[pop] = rows;
+          }
         }
       }
 
