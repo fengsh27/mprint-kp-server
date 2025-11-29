@@ -237,8 +237,12 @@ export default function Home() {
   useEffect(() => {
     if (searchMode === 'simple' && selectedDrug) {
       // Only trigger search if drug is actually selected (not on initial render)
+      // Clear disease and drug class when user selects a drug in simple mode
+      setSelectedDisease('');
+      setSelectedDrugClass('');
       setQueryDrug(selectedDrug);
       setQueryDisease('');
+      setQueryDrugClass('');
       handleTabChange("overview");
       handleConceptChange(selectedDrug, '');
     }
@@ -262,27 +266,41 @@ export default function Home() {
       isQueryStateValid(queryDisease) || 
       isQueryStateValid(queryDrugClass)
     ) {
-      // populate drug list and set selected drug to advanced if drug is selected
-      daGetDrugList().then((data: any) => {
-        const drugs = (data.druglist as Array<{name: string, type: string}>).filter(
-          (item) => item.type == "drug"
-        ).map(item => item.name);
-        setDrugList(drugs);
-        if (isQueryStateValid(queryDrug)) {
-          setSelectedDrug(queryDrug);
+      // Handle drug class query parameter
+      if (isQueryStateValid(queryDrugClass)) {
+        setSearchMode('drugclass');
+        // Load drug class hierarchy
+        daGetDrugClassList().then((data: any) => {
+          setDrugClassHierarchy(data);
+          // Set selected drug class and jump to DrugClass tab
+          setSelectedDrugClass(queryDrugClass);
+          setActiveTab('drugclass');
+        }).catch((error: any) => {
+          console.error('Error fetching drug class list:', error);
+        });
+      } else {
+        // populate drug list and set selected drug to advanced if drug is selected
+        daGetDrugList().then((data: any) => {
+          const drugs = (data.druglist as Array<{name: string, type: string}>).filter(
+            (item) => item.type == "drug"
+          ).map(item => item.name);
+          setDrugList(drugs);
+          if (isQueryStateValid(queryDrug)) {
+            setSelectedDrug(queryDrug);
+          }
+        });
+        if (isQueryStateValid(queryDisease)) {
+          setSearchMode('advanced');
+          populateDiseaseList(queryDisease);
         }
-      });
-      if (isQueryStateValid(queryDisease)) {
-        setSearchMode('advanced');
-        populateDiseaseList(queryDisease);
+        // Trigger search after a short delay to ensure data is loaded
+        const timer = setTimeout(() => {
+          if (isQueryStateValid(queryDrug) || isQueryStateValid(queryDisease)) {
+            handleConceptChange(queryDrug??"", queryDisease??"");
+          }
+        }, 100);
+        return () => clearTimeout(timer);
       }
-      // Trigger search after a short delay to ensure data is loaded
-      const timer = setTimeout(() => {
-        if (isQueryStateValid(queryDrug) || isQueryStateValid(queryDisease)) {
-          handleConceptChange(queryDrug??"", queryDisease??"");
-        }
-      }, 100);
-      return () => clearTimeout(timer);
     } else {
       initializeOverview();
     }
@@ -387,6 +405,9 @@ export default function Home() {
     if (!selectedDrug && !selectedDisease) {
       return; // Don't search if no parameters are selected
     }
+    // Clear drug class when searching in Advanced mode (since Advanced mode uses drug/disease)
+    setSelectedDrugClass('');
+    setQueryDrugClass('');
     setQueryDrug(selectedDrug ?? "");
     setQueryDisease(selectedDisease ?? "");
     handleTabChange("overview");
@@ -395,27 +416,7 @@ export default function Home() {
 
   function handleSearchModeChange(e: any) {
     setSearchMode(e.target.value);
-    if (e.target.value === 'simple') {
-      try {
-        setSelectedDisease('');
-        setSelectedDrugClass('');
-      } catch (error) {
-        console.warn('Error clearing selections:', error);        
-      }
-    } else if (e.target.value === 'advanced') {
-      try {
-        setSelectedDrugClass('');
-      } catch (error) {
-        console.warn('Error clearing drug class selection:', error);
-      }
-    } else if (e.target.value === 'drugclass') {
-      try {
-        setSelectedDrug('');
-        setSelectedDisease('');
-      } catch (error) {
-        console.warn('Error clearing drug/disease selections:', error);
-      }
-    }
+    // Don't clear selections when switching modes - only clear when user makes new selections
   }
 
   function clearAllSearch() {
@@ -425,6 +426,7 @@ export default function Home() {
       setSelectedDrugClass('');
       setQueryDrug('');
       setQueryDisease('');
+      setQueryDrugClass('');
       initializeOverview();
       setPopulationData(DEFAULT_POPULATION_DATA);
     } catch (error) {
@@ -438,10 +440,38 @@ export default function Home() {
     setActiveTab('overview');
   }
 
+  function handleDrugChange(drug: string) {
+    setSelectedDrug(drug);
+    if (searchMode === 'simple') {
+      setQueryDrug(drug);
+      if (drug) {
+        setSelectedDrugClass('');
+        setQueryDrugClass('');
+        setSelectedDisease('');
+        setQueryDisease('');
+      }
+    }
+  }
+
   function handleDrugClassChange(drugClass: string) {
     setSelectedDrugClass(drugClass);
     if (drugClass) {
+      // Set query parameter
+      setQueryDrugClass(drugClass);
+      // Clear drug and disease selections
+      setSelectedDrug('');
+      setSelectedDisease('');
+      setQueryDrug('');
+      setQueryDisease('');
+      // Set search mode to drugclass
+      setSearchMode('drugclass');
+      // Jump to DrugClass tab
       setActiveTab('drugclass');
+      setHasDrugSearched(false);
+      setConcepts([]);
+    } else {
+      // Clear query parameter when drug class is cleared
+      setQueryDrugClass('');
     }
   }
 
@@ -575,7 +605,7 @@ export default function Home() {
                       <div className="relative">
                           <VirtualizedSelect
                             value={selectedDrug}
-                            onValueChange={setSelectedDrug}
+                            onValueChange={handleDrugChange}
                             placeholder="Select a drug"
                             options={drugList.map(drug => ({ value: drug, label: drug }))}
                             searchPlaceholder="Search drugs..."
@@ -585,13 +615,7 @@ export default function Home() {
                         
                         {selectedDrug && (
                           <button
-                            onClick={() => {
-                              try {
-                                setSelectedDrug('');
-                              } catch (error) {
-                                console.warn('Error clearing drug selection:', error);
-                              }
-                            }}
+                            onClick={clearAllSearch}
                             className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
                             title="Clear selection"
                           >
@@ -689,22 +713,22 @@ export default function Home() {
                     </div>
                   )}
                   
-                  <div className="flex space-x-2">
-                    {searchMode !== 'simple' && (
+                  {searchMode !== 'drugclass' && searchMode !== 'simple' && (
+                    <div className="flex space-x-2">
                       <button 
                         className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
                         onClick={handleSearch}
                       >
                         Search
                       </button>
-                    )}
-                    <button 
-                      className={`${searchMode === 'simple' ? 'flex-1' : ''} px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors`}
-                      onClick={clearAllSearch}
-                    >
-                      Clear
-                    </button>
-                  </div>
+                      <button 
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                        onClick={clearAllSearch}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
                 </div>
               </Accordion.Content>
             </Accordion.Item>
