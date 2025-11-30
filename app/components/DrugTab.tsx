@@ -165,9 +165,9 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
             className="w-full space-y-4"
           >
             {/* Drug Classification Accordion */}
-                        <Accordion.Item value="drug-classification" className="border border-gray-200 rounded-lg bg-white shadow-sm">
+            <Accordion.Item value="drug-classification" className="border border-gray-200 rounded-lg bg-white shadow-sm">
               <Accordion.Header className="flex">
-                <Accordion.Trigger className="flex-1 flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors rounded-t-lg data-[state=open]:bg-blue-50 data-[state=open]:border-b data-[state=open]:border-blue-200">
+                <Accordion.Trigger className="group flex-1 flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors rounded-t-lg data-[state=open]:bg-blue-50 data-[state=open]:border-b data-[state=open]:border-blue-200">
                 <div className="flex items-center">
                   <Info className="w-5 h-5 text-blue-600 mr-3" />
                   <h3 className="text-lg font-semibold text-gray-900">Drug Classification</h3>
@@ -245,9 +245,9 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
           </Accordion.Item>
 
           {/* PK Information Accordion */}
-                      <Accordion.Item value="pk-information" className="border border-gray-200 rounded-lg bg-white shadow-sm">
+            <Accordion.Item value="pk-information" className="border border-gray-200 rounded-lg bg-white shadow-sm">
               <Accordion.Header className="flex">
-                <Accordion.Trigger className="flex-1 flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors data-[state=open]:bg-blue-50 data-[state=open]:border-b data-[state=open]:border-blue-200">
+                <Accordion.Trigger className="group flex-1 flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors data-[state=open]:bg-blue-50 data-[state=open]:border-b data-[state=open]:border-blue-200">
                 <div className="flex items-center">
                   <Info className="w-5 h-5 text-blue-600 mr-3" />
                   <h3 className="text-lg font-semibold text-gray-900">PK Information</h3>
@@ -359,9 +359,9 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
           </Accordion.Item>
 
           {/* Maternal and Pediatric Use in Labels Accordion */}
-                      <Accordion.Item value="maternal-pediatric" className="border border-gray-200 rounded-lg bg-white shadow-sm">
+            <Accordion.Item value="maternal-pediatric" className="border border-gray-200 rounded-lg bg-white shadow-sm">
               <Accordion.Header className="flex">
-                <Accordion.Trigger className="flex-1 flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors data-[state=open]:bg-blue-50 data-[state=open]:border-b data-[state=open]:border-blue-200">
+                <Accordion.Trigger className="group flex-1 flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors data-[state=open]:bg-blue-50 data-[state=open]:border-b data-[state=open]:border-blue-200">
                 <div className="flex items-center">
                   <Info className="w-5 h-5 text-blue-600 mr-3" />
                   <h3 className="text-lg font-semibold text-gray-900">Maternal and Pediatric Use in Labels</h3>
