@@ -244,6 +244,10 @@ export default function Home() {
       setQueryDrug(selectedDrug);
       setQueryDisease('');
       setQueryDrugClass('');
+      setConcepts([]);
+      setPmidData([]);
+      setTypeData([]);
+      setPublicationData([]);
       handleTabChange("overview");
       handleConceptChange(selectedDrug, '');
     }
@@ -422,6 +426,10 @@ export default function Home() {
     setQueryDrugClass('');
     setQueryDrug(selectedDrug ?? "");
     setQueryDisease(selectedDisease ?? "");
+    setConcepts([]);
+    setPmidData([]);
+    setTypeData([]);
+    setPublicationData([]);
     handleTabChange("overview");
     handleConceptChange(selectedDrug, selectedDisease);
   }
