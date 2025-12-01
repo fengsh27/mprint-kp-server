@@ -98,10 +98,10 @@ export default function VirtualizedSelect({
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white flex items-center justify-between"
       >
-        <span className={selectedOption ? "text-gray-900" : "text-gray-500"}>
+        <span className={`${selectedOption ? "text-gray-900" : "text-gray-500"} truncate flex-1 text-left`} title={selectedOption ? selectedOption.label : placeholder}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDownIcon className="w-4 h-4 text-gray-400" />
+        <ChevronDownIcon className="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
       </button>
 
       {/* Dropdown */}

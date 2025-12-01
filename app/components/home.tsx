@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Download, BarChart3, Info, ChevronDownIcon } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
 import Image from 'next/image';
-import * as Accordion from '@radix-ui/react-accordion';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useQueryState } from 'nuqs';
 import { useDebouncedCallback } from "use-debounce";
-import VirtualizedSelect from './VirtualizedSelect';
-import DrugClassSelect from './DrugClassSelect';
+import LeftPanel from './LeftPanel';
 import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
 import PublicationTab from './PublicationTab';
@@ -23,6 +21,7 @@ import {
   daGetStudy, 
   daGetTypePopulation,
   daGetDrugClassList,
+  daGetDrugClassListByLevel,
 } from "../dataprovider/dataaccessor";
 import { 
   ConceptRow, 
@@ -143,6 +142,8 @@ export default function Home() {
   const [selectedDrug, setSelectedDrug] = useState('');
   const [selectedDisease, setSelectedDisease] = useState('');
   const [selectedDrugClass, setSelectedDrugClass] = useState('');
+  const [selectedDrugClassLevel, setSelectedDrugClassLevel] = useState<1 | 2 | 3>(1);
+  const [drugClassList, setDrugClassList] = useState<Array<{value: string, label: string, preferred_label: string | null}>>([]);
   const [drugClassHierarchy, setDrugClassHierarchy] = useState<{level1: string[], level2: string[], level3: string[]}>({
     level1: [],
     level2: [],
@@ -258,6 +259,17 @@ export default function Home() {
       });
     }
   }, [searchMode]);
+
+  // Load drug class list for selected level
+  useEffect(() => {
+    if (searchMode === 'drugclass') {
+      daGetDrugClassListByLevel(selectedDrugClassLevel).then((data: any) => {
+        setDrugClassList(data);
+      }).catch((error: any) => {
+        console.error('Error fetching drug class list by level:', error);
+      });
+    }
+  }, [searchMode, selectedDrugClassLevel]);
 
   // Auto-search when URL parameters are present on page load
   useEffect(() => {
@@ -416,6 +428,10 @@ export default function Home() {
 
   function handleSearchModeChange(e: any) {
     setSearchMode(e.target.value);
+    // Reset drug class level to 1 when switching to drug class mode
+    if (e.target.value === 'drugclass') {
+      setSelectedDrugClassLevel(1);
+    }
     // Don't clear selections when switching modes - only clear when user makes new selections
   }
 
@@ -424,6 +440,7 @@ export default function Home() {
       setSelectedDrug('');
       setSelectedDisease('');
       setSelectedDrugClass('');
+      setSelectedDrugClassLevel(1);
       setQueryDrug('');
       setQueryDisease('');
       setQueryDrugClass('');
@@ -472,7 +489,17 @@ export default function Home() {
     } else {
       // Clear query parameter when drug class is cleared
       setQueryDrugClass('');
+      // Reset to overview tab when clearing
+      setActiveTab('overview');
     }
+  }
+
+  function handleDrugClassLevelChange(level: 1 | 2 | 3) {
+    setSelectedDrugClassLevel(level);
+    // Clear selected drug class when level changes
+    setSelectedDrugClass('');
+    setQueryDrugClass('');
+    setActiveTab('overview');
   }
 
   function handleDownload() {
@@ -519,313 +546,32 @@ export default function Home() {
 
       <div className="flex">
         {/* Left Sidebar */}
-        <div className={`${sidebarExpanded ? 'w-64' : 'w-16'} bg-gray-100 min-h-screen transition-all duration-300 ease-in-out relative overflow-visible ${sidebarExpanded ? 'min-w-[250px]' : 'min-w-[64px]'}`}>
-          {/* Toggle Button */}
-          <button
-            onClick={() => setSidebarExpanded(!sidebarExpanded)}
-            className="absolute top-2 right-2 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors z-10 shadow-md"
-            title={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            {sidebarExpanded ? (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            )}
-          </button>
-          
-          <div className={`${sidebarExpanded ? 'p-2' : 'p-1'} mt-8`}>
-          {sidebarExpanded ? (
-            <Accordion.Root type="multiple" defaultValue={["search"]} className="space-y-4">
-              {/* Search Section */}
-              <Accordion.Item value="search" className="bg-white rounded-lg shadow-sm">
-              <Accordion.Trigger className="group flex items-center justify-between w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <Search className="w-5 h-5 text-gray-600" />
-                  <span className="font-medium text-gray-900">Search</span>
-                </div>
-                <ChevronDownIcon className="w-5 h-5 text-gray-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-              </Accordion.Trigger>
-              
-              <Accordion.Content className="px-3 pb-3">
-                <div className="pt-2 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Search Mode:
-                    </label>
-                    <div className="space-y-2">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="searchMode"
-                          value="simple"
-                          checked={searchMode === 'simple'}
-                          onChange={handleSearchModeChange}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-700">Simple</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="searchMode"
-                          value="advanced"
-                          checked={searchMode === 'advanced'}
-                          onChange={handleSearchModeChange}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-700">Advanced</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="searchMode"
-                          value="drugclass"
-                          checked={searchMode === 'drugclass'}
-                          onChange={handleSearchModeChange}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-700">Drug Class</span>
-                      </label>
-                    </div>
-                  </div>
-                  
-                  {/* Drug Name Field - Only shown in Simple and Advanced modes */}
-                  {searchMode !== 'drugclass' && (
-                    <div className="relative">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Drug Name:
-                      </label>
-                      <div className="absolute left-20 top-1 w-4 h-4" title="Select a drug to search" >
-                        <Info className="w-4 h-4 text-gray-400" />
-                      </div>
-                      <div className="relative">
-                          <VirtualizedSelect
-                            value={selectedDrug}
-                            onValueChange={handleDrugChange}
-                            placeholder="Select a drug"
-                            options={drugList.map(drug => ({ value: drug, label: drug }))}
-                            searchPlaceholder="Search drugs..."
-                            maxHeight={300}
-                            itemHeight={40}
-                          />
-                        
-                        {selectedDrug && (
-                          <button
-                            onClick={clearAllSearch}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                            title="Clear selection"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Drug Class Field - Only shown in Drug Class mode */}
-                  {searchMode === 'drugclass' && (
-                    <div className="relative">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Drug Class:
-                      </label>
-                      <div className="absolute left-20 top-1 w-4 h-4" title="Select a drug class to search" >
-                        <Info className="w-4 h-4 text-gray-400" />
-                      </div>
-                      <div className="relative">
-                        <DrugClassSelect
-                          value={selectedDrugClass}
-                          onValueChange={handleDrugClassChange}
-                          placeholder="Select a drug class"
-                          hierarchy={drugClassHierarchy}
-                          searchPlaceholder="Search drug classes..."
-                        />
-                        
-                        {selectedDrugClass && (
-                          <button
-                            onClick={() => {
-                              try {
-                                setSelectedDrugClass('');
-                                setActiveTab('overview');
-                              } catch (error) {
-                                console.warn('Error clearing drug class selection:', error);
-                              }
-                            }}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                            title="Clear selection"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Disease Name Field - Only shown in Advanced mode */}
-                  {searchMode === 'advanced' && (
-                    <div className="relative">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Disease Name:
-                      </label>
-                      <div className="absolute left-25 top-1 w-4 h-4" title="Select a disease to search" >
-                        <Info className="w-4 h-4 text-gray-400" />
-                      </div>
-                      <div className="relative">
-                        <VirtualizedSelect
-                          value={selectedDisease}
-                          onValueChange={setSelectedDisease}
-                          placeholder="Select a disease"
-                          options={diseaseList.map(disease => ({ 
-                            value: disease.TERM, 
-                            label: disease.TERM, 
-                            description: disease.des 
-                          }))}
-                          searchPlaceholder="Search diseases..."
-                          maxHeight={300}
-                          itemHeight={50}
-                        />
-                        
-                        {selectedDisease && (
-                          <button
-                            onClick={() => {
-                              try {
-                                setSelectedDisease('');
-                              } catch (error) {
-                                console.warn('Error clearing disease selection:', error);
-                              }
-                            }}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                            title="Clear selection"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {searchMode !== 'drugclass' && searchMode !== 'simple' && (
-                    <div className="flex space-x-2">
-                      <button 
-                        className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-                        onClick={handleSearch}
-                      >
-                        Search
-                      </button>
-                      <button 
-                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                        onClick={clearAllSearch}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </Accordion.Content>
-            </Accordion.Item>
-
-            {/* Download Data Section */}
-            <Accordion.Item value="download" className="bg-white rounded-lg shadow-sm">
-              <Accordion.Trigger className="group flex items-center justify-between w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <Download className="w-5 h-5 text-gray-600" />
-                  <span className="text-gray-900 font-medium">Download Data</span>
-                </div>
-                <ChevronDownIcon className="w-5 h-5 text-gray-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-              </Accordion.Trigger>
-              
-              <Accordion.Content className="px-3 pb-3">
-                <div className="pt-2 space-y-3">
-                  {(!publicationData || publicationData.length === 0) && (
-                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                      <div className="flex items-center space-x-2">
-                        <svg className="w-4 h-4 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-sm text-yellow-800 font-medium">Please select drug or disease first</span>
-                      </div>
-                    </div>
-                  )}
-                  <div className="text-sm text-gray-700 font-medium mb-3">
-                    Download Publication Data as:
-                  </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="download-format" 
-                        value="excel" 
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                        disabled={!publicationData || publicationData.length === 0}
-                        checked={downloadType === 'xlsx'}
-                        onChange={() => setDownloadType('xlsx')}
-                      />
-                      <span className="text-sm text-gray-700">Excel</span>
-                    </label>
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="download-format" 
-                        value="csv" 
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                        disabled={!publicationData || publicationData.length === 0}
-                        checked={downloadType === 'csv'}
-                        onChange={() => setDownloadType('csv')}
-                      />
-                      <span className="text-sm text-gray-700">CSV</span>
-                    </label>
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input 
-                        type="radio" 
-                        name="download-format" 
-                        value="tsv" 
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                        disabled={!publicationData || publicationData.length === 0}
-                        checked={downloadType === 'tsv'}
-                        onChange={() => setDownloadType('tsv')}
-                      />
-                      <span className="text-sm text-gray-700">TSV</span>
-                    </label>
-                  </div>
-                  <div className="pt-3">
-                    <button 
-                      className={`w-full py-2 px-4 rounded-md transition-colors ${
-                        (!pmidData || pmidData.length === 0 || !typeData || typeData.length === 0)
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }`}
-                      disabled={!publicationData || publicationData.length === 0}
-                      onClick={handleDownload}
-                    >
-                      Download
-                    </button>
-                  </div>
-                </div>
-              </Accordion.Content>
-            </Accordion.Item>
-          </Accordion.Root>
-          ) : (
-            // Collapsed sidebar - show only icons
-            <div className="space-y-4 pt-4">
-              <div className="bg-white rounded-lg shadow-sm p-3 hover:bg-gray-50 transition-colors cursor-pointer" title="Search">
-                <Search className="w-5 h-5 text-gray-600 mx-auto" />
-              </div>
-              <div className="bg-white rounded-lg shadow-sm p-3 hover:bg-gray-50 transition-colors cursor-pointer" title="Download Data">
-                <Download className="w-5 h-5 text-gray-600 mx-auto" />
-              </div>
-            </div>
-          )}
-          </div>
-        </div>
+        <LeftPanel
+          searchMode={searchMode}
+          onSearchModeChange={handleSearchModeChange}
+          drugList={drugList}
+          diseaseList={diseaseList}
+          selectedDrug={selectedDrug}
+          selectedDisease={selectedDisease}
+          selectedDrugClass={selectedDrugClass}
+          selectedDrugClassLevel={selectedDrugClassLevel}
+          drugClassList={drugClassList}
+          drugClassHierarchy={drugClassHierarchy}
+          onDrugChange={handleDrugChange}
+          onDiseaseChange={setSelectedDisease}
+          onDrugClassChange={handleDrugClassChange}
+          onDrugClassLevelChange={handleDrugClassLevelChange}
+          onSearch={handleSearch}
+          onClearAll={clearAllSearch}
+          publicationData={publicationData}
+          downloadType={downloadType}
+          onDownloadTypeChange={setDownloadType}
+          onDownload={handleDownload}
+          pmidData={pmidData}
+          typeData={typeData}
+          sidebarExpanded={sidebarExpanded}
+          onSidebarToggle={() => setSidebarExpanded(!sidebarExpanded)}
+        />
 
         {/* Main Content */}
         <div className="flex-1 bg-white p-10">

@@ -153,42 +153,30 @@ export default function DrugClassTab({ selectedDrugClass }: DrugClassTabProps) {
     const pkValues = populationData.map(d => d.pk || 0);
     const peValues = populationData.map(d => d.pe || 0);
     const ctValues = populationData.map(d => d.ct || 0);
-    const vcValues = populationData.map(d => d.vc || 0);
-    const fbnstpValues = populationData.map(d => d.fbnstp || 0);
-    const biomarkerValues = populationData.map(d => d.biomarker || 0);
 
-    // Create combined data for all 6 columns
+    // Create combined data for 3 columns: PK, PE, CT
     const originalZ: number[][] = [];
     const zValues: number[][] = [];
     
     for (let i = 0; i < names.length; i++) {
-      // Combine all 6 columns: PK, PE, CT, VC, FBNSTP, Biomarker
+      // Combine 3 columns: PK, PE, CT
       originalZ.push([
         pkValues[i], 
         peValues[i], 
-        ctValues[i], 
-        vcValues[i], 
-        fbnstpValues[i], 
-        biomarkerValues[i]
+        ctValues[i]
       ]);
       
       if (heatmapType === 'drugs') {
         zValues.push([
           Math.log10(pkValues[i] + 1),
           Math.log10(peValues[i] + 1),
-          Math.log10(ctValues[i] + 1),
-          Math.log10(vcValues[i] + 1),
-          Math.log10(fbnstpValues[i] + 1),
-          Math.log10(biomarkerValues[i] + 1)
+          Math.log10(ctValues[i] + 1)
         ]);
       } else {
         zValues.push([
           pkValues[i], 
           peValues[i], 
-          ctValues[i], 
-          vcValues[i], 
-          fbnstpValues[i], 
-          biomarkerValues[i]
+          ctValues[i]
         ]);
       }
     }
@@ -198,7 +186,7 @@ export default function DrugClassTab({ selectedDrugClass }: DrugClassTabProps) {
     
     // Find max actual value (for colorbar labels when using log scale)
     const maxActualValue = heatmapType === 'drugs' 
-      ? Math.max(...pkValues, ...peValues, ...ctValues, ...vcValues, ...fbnstpValues, ...biomarkerValues, 1)
+      ? Math.max(...pkValues, ...peValues, ...ctValues, 1)
       : maxZValue;
 
     // Helper function to generate colorbar ticks for log scale
@@ -239,12 +227,12 @@ export default function DrugClassTab({ selectedDrugClass }: DrugClassTabProps) {
 
     const colorbarTicks = generateLogColorbarTicks(maxZValue, maxActualValue);
 
-    // Create single heatmap trace with all 6 columns
+    // Create single heatmap trace with 3 columns: PK, PE, CT
     const trace: any = {
       z: zValues,
       text: originalZ,
       texttemplate: '', // Hide text, we'll use hover only
-      x: ['PK', 'PE', 'CT', 'VC', 'FBNSTP', 'Biomarker'],
+      x: ['PK', 'PE', 'CT'],
       y: names,
       type: 'heatmap' as const,
       colorscale: [

@@ -66,7 +66,7 @@ def process_drug_class(file_path: str) -> pd.DataFrame:
     return result_df
 
 
-def save_to_sqlite3(db_path: str, table_name: str, result: pd.DataFrame) -> None:
+def save_drug_class_to_sqlite3(db_path: str, table_name: str, result: pd.DataFrame) -> None:
     """
     Save a pandas DataFrame to a SQLite3 database table.
     
@@ -211,18 +211,93 @@ def save_to_sqlite3(db_path: str, table_name: str, result: pd.DataFrame) -> None
         conn.close()
 
 
+def process_atc(file_path: str, db_path: str) -> None:
+    """
+    Read ATC.csv file and create ATC table in SQLite database.
+    
+    Args:
+        file_path: Path to the ATC.csv file
+        db_path: Path to the SQLite database file
+        
+    Creates a table 'ATC' with columns:
+        - level_code VARCHAR(64) (primary key)
+        - preferred_label TEXT
+        - atc_level INTEGER
+    """
+    # Read the CSV file
+    df = pd.read_csv(file_path, dtype=str)
+    
+    # Rename columns to match database schema
+    df = df.rename(columns={
+        'Level code': 'level_code',
+        'Preferred Label': 'preferred_label',
+        'ATC LEVEL': 'atc_level'
+    })
+    
+    # Ensure level_code is string and truncate to 64 characters
+    df['level_code'] = df['level_code'].astype(str).str[:64]
+    
+    # Ensure preferred_label is string
+    df['preferred_label'] = df['preferred_label'].astype(str)
+    
+    # Convert atc_level to integer
+    df['atc_level'] = pd.to_numeric(df['atc_level'], errors='coerce').astype('Int64')
+    
+    # Connect to SQLite database
+    conn = sqlite3.connect(db_path)
+    
+    try:
+        # Create table with the specified schema
+        create_table_sql = """
+        CREATE TABLE IF NOT EXISTS ATC (
+            level_code VARCHAR(64) PRIMARY KEY,
+            preferred_label TEXT,
+            atc_level INTEGER
+        )
+        """
+        conn.execute(create_table_sql)
+        
+        # Clear existing data (safe even if table is empty)
+        conn.execute("DELETE FROM ATC")
+        
+        # Insert data
+        df[['level_code', 'preferred_label', 'atc_level']].to_sql(
+            'ATC', 
+            conn, 
+            if_exists='append', 
+            index=False,
+            method='multi'
+        )
+        
+        # Commit the transaction
+        conn.commit()
+        
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
-    result = process_drug_class("data/2_ped1218_drug_with_count.txt")
-    save_to_sqlite3("data/drug_class.db", "ped1218", result)
+    # result = process_drug_class("data/2_ped1218_drug_with_count.txt")
+    # save_drug_class_to_sqlite3("data/drug_class.db", "ped1218", result)
 
-    result = process_drug_class("data/2_ped112_drug_with_count.txt")
-    save_to_sqlite3("data/drug_class.db", "ped112", result)
+    # result = process_drug_class("data/2_ped112_drug_with_count.txt")
+    # save_drug_class_to_sqlite3("data/drug_class.db", "ped112", result)
 
-    result = process_drug_class("data/2_ped01_drug_with_count.txt")
-    save_to_sqlite3("data/drug_class.db", "ped01", result)
+    # result = process_drug_class("data/2_ped01_drug_with_count.txt")
+    # save_drug_class_to_sqlite3("data/drug_class.db", "ped01", result)
 
-    result = process_drug_class("data/2_postpartum_drug_with_count.txt")
-    save_to_sqlite3("data/drug_class.db", "postpartum", result)
+    # result = process_drug_class("data/2_postpartum_drug_with_count.txt")
+    # save_drug_class_to_sqlite3("data/drug_class.db", "postpartum", result)
 
-    result = process_drug_class("data/2_pregnancy_drug_with_count.txt")
-    save_to_sqlite3("data/drug_class.db", "pregnancy", result)
+    # result = process_drug_class("data/2_pregnancy_drug_with_count.txt")
+    # save_drug_class_to_sqlite3("data/drug_class.db", "pregnancy", result)
+
+    process_atc("data/ATC.csv", "data/drug_class.db")
+
+
+
+
+
