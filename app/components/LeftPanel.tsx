@@ -3,7 +3,6 @@
 import { Search, Download, Info, ChevronDownIcon } from 'lucide-react';
 import * as Accordion from '@radix-ui/react-accordion';
 import VirtualizedSelect from './VirtualizedSelect';
-import DrugClassSelect from './DrugClassSelect';
 
 interface LeftPanelProps {
   searchMode: string;
@@ -13,10 +12,13 @@ interface LeftPanelProps {
   selectedDrug: string;
   selectedDisease: string;
   selectedDrugClass: string;
+  selectedDrugClassLevel: 1 | 2 | 3;
+  drugClassList: Array<{value: string, label: string, preferred_label: string | null}>;
   drugClassHierarchy: {level1: string[], level2: string[], level3: string[]};
   onDrugChange: (drug: string) => void;
   onDiseaseChange: (disease: string) => void;
   onDrugClassChange: (drugClass: string) => void;
+  onDrugClassLevelChange: (level: 1 | 2 | 3) => void;
   onSearch: () => void;
   onClearAll: () => void;
   publicationData: any[];
@@ -37,10 +39,13 @@ export default function LeftPanel({
   selectedDrug,
   selectedDisease,
   selectedDrugClass,
+  selectedDrugClassLevel,
+  drugClassList,
   drugClassHierarchy,
   onDrugChange,
   onDiseaseChange,
   onDrugClassChange,
+  onDrugClassLevelChange,
   onSearch,
   onClearAll,
   publicationData,
@@ -122,7 +127,7 @@ export default function LeftPanel({
                           onChange={onSearchModeChange}
                           className="mr-2"
                         />
-                        <span className="text-sm text-gray-700">Drug Class</span>
+                        <span className="text-sm text-gray-700">Drug Class (ATC)</span>
                       </label>
                     </div>
                   </div>
@@ -162,43 +167,67 @@ export default function LeftPanel({
                     </div>
                   )}
                   
-                  {/* Drug Class Field - Only shown in Drug Class mode */}
+                  {/* Drug Class Fields - Only shown in Drug Class mode */}
                   {searchMode === 'drugclass' && (
-                    <div className="relative">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Drug Class:
-                      </label>
-                      <div className="absolute left-20 top-1 w-4 h-4" title="Select a drug class to search" >
-                        <Info className="w-4 h-4 text-gray-400" />
+                    <>
+                      {/* Level Selector */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Level:
+                        </label>
+                        <select
+                          value={selectedDrugClassLevel}
+                          onChange={(e) => onDrugClassLevelChange(parseInt(e.target.value) as 1 | 2 | 3)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        >
+                          <option value={1}>Level 1</option>
+                          <option value={2}>Level 2</option>
+                          <option value={3}>Level 3</option>
+                        </select>
                       </div>
+
+                      {/* Drug Class Selector */}
                       <div className="relative">
-                        <DrugClassSelect
-                          value={selectedDrugClass}
-                          onValueChange={onDrugClassChange}
-                          placeholder="Select a drug class"
-                          hierarchy={drugClassHierarchy}
-                          searchPlaceholder="Search drug classes..."
-                        />
-                        
-                        {selectedDrugClass && (
-                          <button
-                            onClick={() => {
-                              try {
-                                onDrugClassChange('');
-                              } catch (error) {
-                                console.warn('Error clearing drug class selection:', error);
-                              }
-                            }}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                            title="Clear selection"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Drug Class (ATC):
+                        </label>
+                        <div className="absolute left-30 top-1 w-4 h-4" title="Select a drug class to search" >
+                          <Info className="w-4 h-4 text-gray-400" />
+                        </div>
+                        <div className="relative">
+                          <VirtualizedSelect
+                            value={selectedDrugClass}
+                            onValueChange={onDrugClassChange}
+                            placeholder="Select a drug class"
+                            options={drugClassList.map(item => ({ 
+                              value: item.value, 
+                              label: item.label 
+                            }))}
+                            searchPlaceholder="Search drug classes..."
+                            maxHeight={300}
+                            itemHeight={40}
+                          />
+                          
+                          {selectedDrugClass && (
+                            <button
+                              onClick={() => {
+                                try {
+                                  onDrugClassChange('');
+                                } catch (error) {
+                                  console.warn('Error clearing drug class selection:', error);
+                                }
+                              }}
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                              title="Clear selection"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    </>
                   )}
                   
                   {/* Disease Name Field - Only shown in Advanced mode */}

@@ -21,6 +21,7 @@ import {
   daGetStudy, 
   daGetTypePopulation,
   daGetDrugClassList,
+  daGetDrugClassListByLevel,
 } from "../dataprovider/dataaccessor";
 import { 
   ConceptRow, 
@@ -141,6 +142,8 @@ export default function Home() {
   const [selectedDrug, setSelectedDrug] = useState('');
   const [selectedDisease, setSelectedDisease] = useState('');
   const [selectedDrugClass, setSelectedDrugClass] = useState('');
+  const [selectedDrugClassLevel, setSelectedDrugClassLevel] = useState<1 | 2 | 3>(1);
+  const [drugClassList, setDrugClassList] = useState<Array<{value: string, label: string, preferred_label: string | null}>>([]);
   const [drugClassHierarchy, setDrugClassHierarchy] = useState<{level1: string[], level2: string[], level3: string[]}>({
     level1: [],
     level2: [],
@@ -256,6 +259,17 @@ export default function Home() {
       });
     }
   }, [searchMode]);
+
+  // Load drug class list for selected level
+  useEffect(() => {
+    if (searchMode === 'drugclass') {
+      daGetDrugClassListByLevel(selectedDrugClassLevel).then((data: any) => {
+        setDrugClassList(data);
+      }).catch((error: any) => {
+        console.error('Error fetching drug class list by level:', error);
+      });
+    }
+  }, [searchMode, selectedDrugClassLevel]);
 
   // Auto-search when URL parameters are present on page load
   useEffect(() => {
@@ -414,6 +428,10 @@ export default function Home() {
 
   function handleSearchModeChange(e: any) {
     setSearchMode(e.target.value);
+    // Reset drug class level to 1 when switching to drug class mode
+    if (e.target.value === 'drugclass') {
+      setSelectedDrugClassLevel(1);
+    }
     // Don't clear selections when switching modes - only clear when user makes new selections
   }
 
@@ -422,6 +440,7 @@ export default function Home() {
       setSelectedDrug('');
       setSelectedDisease('');
       setSelectedDrugClass('');
+      setSelectedDrugClassLevel(1);
       setQueryDrug('');
       setQueryDisease('');
       setQueryDrugClass('');
@@ -473,6 +492,14 @@ export default function Home() {
       // Reset to overview tab when clearing
       setActiveTab('overview');
     }
+  }
+
+  function handleDrugClassLevelChange(level: 1 | 2 | 3) {
+    setSelectedDrugClassLevel(level);
+    // Clear selected drug class when level changes
+    setSelectedDrugClass('');
+    setQueryDrugClass('');
+    setActiveTab('overview');
   }
 
   function handleDownload() {
@@ -527,10 +554,13 @@ export default function Home() {
           selectedDrug={selectedDrug}
           selectedDisease={selectedDisease}
           selectedDrugClass={selectedDrugClass}
+          selectedDrugClassLevel={selectedDrugClassLevel}
+          drugClassList={drugClassList}
           drugClassHierarchy={drugClassHierarchy}
           onDrugChange={handleDrugChange}
           onDiseaseChange={setSelectedDisease}
           onDrugClassChange={handleDrugClassChange}
+          onDrugClassLevelChange={handleDrugClassLevelChange}
           onSearch={handleSearch}
           onClearAll={clearAllSearch}
           publicationData={publicationData}

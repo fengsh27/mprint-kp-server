@@ -65,4 +65,9 @@ export const daGetDrugClass = (
 export const daGetDrugClassList = (opts?: { signal?: AbortSignal }) =>
   api.get<unknown>("/api/drug_class/list", opts);
 
+export const daGetDrugClassListByLevel = (
+  level: 1 | 2 | 3,
+  opts?: { signal?: AbortSignal }
+) => api.get<unknown>(`/api/drug_class/list/${level}`, opts);
+
 
