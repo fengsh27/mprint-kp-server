@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.12](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.11...v0.1.12) (2025-12-01)
+
+
+### Features
+
+* add atc label and integrate drug class select to left pane ([#8](https://github.com/fengsh27/mprint-kp-server/issues/8)) ([d9ce7c3](https://github.com/fengsh27/mprint-kp-server/commit/d9ce7c3f1cef916811a4a515c7ccce00df9c22fc))
+
 ### [0.1.11](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.10...v0.1.11) (2025-11-30)
 
 
