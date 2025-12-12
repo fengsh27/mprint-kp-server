@@ -34,7 +34,8 @@ async function studyHandler(req: Request) {
       );
     }
 
-    const arrayValidation = InputValidator.validateArray(body, 'request body', 5000);
+    const MAX_ARRAY_LENGTH = 15000;
+    const arrayValidation = InputValidator.validateArray(body, 'request body', MAX_ARRAY_LENGTH);
     if (!arrayValidation.valid) {
       logSecurityEvent(req as any, 'INVALID_INPUT', { error: arrayValidation.error });
       return NextResponse.json(
