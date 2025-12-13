@@ -79,7 +79,7 @@ const PublicationTableColumns = [
     resizable: true,
     renderCell: ({ row, column }: { row: any; column: any }) => (
       <div className="text-center">
-        {row[column.key]}
+        {row[column.key] != null ? Math.floor(Number(row[column.key])) : row[column.key]}
       </div>
     ),
   },
