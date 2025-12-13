@@ -3,6 +3,8 @@
  * Tracks execution time for database queries and logs them
  */
 
+import { writeLogToFile } from './file_logger';
+
 export interface QueryTimingInfo {
   queryName: string;
   durationMs: number;
@@ -51,6 +53,11 @@ export function logQueryTiming(info: QueryTimingInfo): void {
 
   // Log to console with structured format
   console.log('[QUERY_TIMING]', JSON.stringify(logData, null, 2));
+  
+  // Write to file asynchronously (don't await to avoid blocking)
+  writeLogToFile(logData).catch(err => {
+    // Silently handle file write errors - already logged in file_logger
+  });
 }
 
 /**
