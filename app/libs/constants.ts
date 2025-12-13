@@ -1,0 +1,1 @@
+export const MAX_QUERIED_ARRAY_LENGTH = 50000;

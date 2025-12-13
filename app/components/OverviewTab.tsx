@@ -16,6 +16,7 @@ interface OverviewTabProps {
   pharmChartData: any[];
   clinicalChartData: any[];
   chartLayout: any;
+  isLoadingPopulationData?: boolean;
 }
 
 export default function OverviewTab({ 
@@ -23,7 +24,8 @@ export default function OverviewTab({
   pkChartData, 
   pharmChartData, 
   clinicalChartData, 
-  chartLayout 
+  chartLayout,
+  isLoadingPopulationData = false
 }: OverviewTabProps) {
   const isChartDataEmpty = (data: any[]) => {
     return !data || data.length === 0 || data[0].y.every((y: any) => parseInt(y) === 0);
@@ -36,7 +38,11 @@ export default function OverviewTab({
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-4xl font-bold text-blue-600">{overallStudyType.pk.count}</p>
+              {isLoadingPopulationData ? (
+                <p className="text-lg font-medium text-gray-500">Retrieving data ...</p>
+              ) : (
+                <p className="text-4xl font-bold text-blue-600">{overallStudyType.pk.count}</p>
+              )}
               <p className="text-gray-600 mt-1">Pharmacokinetics</p>
             </div>
             <Edit className="w-5 h-5 text-blue-600" />
@@ -46,7 +52,11 @@ export default function OverviewTab({
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-4xl font-bold text-blue-600">{overallStudyType.pe.count}</p>
+              {isLoadingPopulationData ? (
+                <p className="text-lg font-medium text-gray-500">Retrieving data ...</p>
+              ) : (
+                <p className="text-4xl font-bold text-blue-600">{overallStudyType.pe.count}</p>
+              )}
               <p className="text-gray-600 mt-1">Pharmacoepidemiology</p>
             </div>
             <Edit className="w-5 h-5 text-blue-600" />
@@ -56,7 +66,11 @@ export default function OverviewTab({
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-4xl font-bold text-blue-600">{overallStudyType.ct.count}</p>
+              {isLoadingPopulationData ? (
+                <p className="text-lg font-medium text-gray-500">Retrieving data ...</p>
+              ) : (
+                <p className="text-4xl font-bold text-blue-600">{overallStudyType.ct.count}</p>
+              )}
               <p className="text-gray-600 mt-1">Clinical Trial</p>
             </div>
             <User className="w-5 h-5 text-blue-600" />

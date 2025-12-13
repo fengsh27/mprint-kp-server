@@ -19,6 +19,7 @@ import {
   daGetOverallStudyType, 
   daGetPMIDs, 
   daGetStudy, 
+  daGetStudyCount,
   daGetTypePopulation,
   daGetDrugClassList,
   daGetDrugClassListByLevel,
@@ -166,6 +167,9 @@ export default function Home() {
   const [pmidData, setPmidData] = useState<PmidRow[]>([]);
   const [typeData, setTypeData] = useState<TypeData[]>([]);
   const [publicationData, setPublicationData] = useState<PublicationTableRow[]>([]);
+  const [publicationCount, setPublicationCount] = useState<number | null>(null);
+  const [isLoadingPublications, setIsLoadingPublications] = useState(false);
+  const [isLoadingPopulationData, setIsLoadingPopulationData] = useState(false);
   const [downloadType, setDownloadType] = useState<'xlsx' | 'csv' | 'tsv'>('xlsx');
 
   const [overallStudyType, setOverallStudyType] = useState({
@@ -324,14 +328,33 @@ export default function Home() {
 
   useEffect(() => {
     if (!pmidData || pmidData.length === 0 || !typeData || typeData.length === 0) {
+      setPublicationData([]);
+      setPublicationCount(null);
+      setIsLoadingPublications(false);
       return;
     }
-    daGetStudy(pmidData).then((data: any) => {
-      const studyData = data as StudyData[];
-      const publicationData = buildPublicationTable(studyData, typeData);
-      setPublicationData(publicationData);
+    
+    setIsLoadingPublications(true);
+    setPublicationData([]);
+    
+    // First, get the count
+    daGetStudyCount(pmidData).then((response: any) => {
+      const count = response?.count ?? 0;
+      setPublicationCount(count);
+      
+      // Then fetch the full data
+      daGetStudy(pmidData).then((data: any) => {
+        const studyData = data as StudyData[];
+        const publicationData = buildPublicationTable(studyData, typeData);
+        setPublicationData(publicationData);
+        setIsLoadingPublications(false);
+      }).catch((error: any) => {
+        console.error('Error fetching study data:', error);
+        setIsLoadingPublications(false);
+      });
     }).catch((error: any) => {
-      console.error('Error fetching study data:', error);
+      console.error('Error fetching study count:', error);
+      setIsLoadingPublications(false);
     });
   }, [pmidData, typeData]);
 
@@ -374,12 +397,16 @@ export default function Home() {
       return;
     }
     
+    // Set loading state for population data
+    setIsLoadingPopulationData(true);
+    
     // Ensure we have valid string parameters
     const safeDrug = String(drug || '');
     const safeDisease = String(disease || '');
     
     daGetConcepts(safeDrug, safeDisease).then((data: any) => {
       if (!data) {
+        setIsLoadingPopulationData(false);
         return;
       }
       const concepts: ConceptRow[] = data as ConceptRow[];
@@ -412,8 +439,18 @@ export default function Home() {
           const thePopulationData = preparePopulationData(pkPlotData, pePlotData, ctPlotData);
 
           setPopulationData(thePopulationData);
+          setIsLoadingPopulationData(false);
+        }).catch((error: any) => {
+          console.error('Error fetching type population data:', error);
+          setIsLoadingPopulationData(false);
         });
+      }).catch((error: any) => {
+        console.error('Error fetching PMIDs:', error);
+        setIsLoadingPopulationData(false);
       });
+    }).catch((error: any) => {
+      console.error('Error fetching concepts:', error);
+      setIsLoadingPopulationData(false);
     });
   }, 500);
 
@@ -452,6 +489,7 @@ export default function Home() {
       setQueryDrug('');
       setQueryDisease('');
       setQueryDrugClass('');
+      setIsLoadingPopulationData(false);
       initializeOverview();
       setPopulationData(DEFAULT_POPULATION_DATA);
     } catch (error) {
@@ -649,6 +687,7 @@ export default function Home() {
                   pharmChartData={pharmChartData}
                   clinicalChartData={clinicalChartData}
                   chartLayout={chartLayout}
+                  isLoadingPopulationData={isLoadingPopulationData}
                 />
               )}
             </Tabs.Content>
@@ -693,7 +732,11 @@ export default function Home() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
             ) : (
-              <PublicationTab publicationData={publicationData} />
+              <PublicationTab 
+                publicationData={publicationData} 
+                publicationCount={publicationCount}
+                isLoading={isLoadingPublications}
+              />
             )}
           </Tabs.Content>
           )}

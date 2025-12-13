@@ -10,6 +10,7 @@ import {
   SearchType,
   StudyResult,
 } from "./types";
+import { timeQuery, timeBatchedQuery } from "./query_timer";
 
 const placeholders = (n: number) => Array(n).fill("?").join(",");
 
@@ -63,11 +64,17 @@ async function fetchConceptsByName(pool: Pool, name?: string): Promise<ConceptRo
     FROM concept
     WHERE name = ?
   `;
-  const [rows] = await pool.execute(sql, [name.trim()]);
-  return (rows as any[]).map(r => ({
-    cui: String(r.cui),
-    type: normalize_concept_type(r.type),
-  }));
+  return timeQuery(
+    'fetchConceptsByName',
+    async () => {
+      const [rows] = await pool.execute(sql, [name.trim()]);
+      return (rows as any[]).map(r => ({
+        cui: String(r.cui),
+        type: normalize_concept_type(r.type),
+      }));
+    },
+    { name: name.trim() }
+  );
 }
 
 async function fetchDiseaseChildren(pool: Pool, cuis: string[]): Promise<ConceptRow[]> {
@@ -78,8 +85,14 @@ async function fetchDiseaseChildren(pool: Pool, cuis: string[]): Promise<Concept
     FROM rel r
     WHERE r.cui1 IN (${placeholders(cuis.length)})
   `;
-  const [rows] = await pool.execute(sql, cuis);
-  return (rows as any[]).map(r => ({ cui: String(r.cui), type: "disease" as const }));
+  return timeQuery(
+    'fetchDiseaseChildren',
+    async () => {
+      const [rows] = await pool.execute(sql, cuis);
+      return (rows as any[]).map(r => ({ cui: String(r.cui), type: "disease" as const }));
+    },
+    { cuiCount: cuis.length }
+  );
 }
 
 export async function queryConceptsMySql(
@@ -87,29 +100,35 @@ export async function queryConceptsMySql(
   inputs: QueryInputs
 ): Promise<ConceptRow[]> {
   const { drugName, diseaseName } = inputs;
-  if (diseaseName === undefined && drugName === undefined) {
-    return [];
-  }
-  if (diseaseName === undefined) {    
-    const concepts = await fetchConceptsByName(pool, drugName);
-    if (concepts.length > 0 && concepts.every(c => c.type === "disease")) {
-      const children = await fetchDiseaseChildren(pool, concepts.map(c => c.cui));
-      return dedup_rows([...concepts, ...children], (c: ConceptRow) => `${c.type}:${c.cui}`);
-    }
-    return dedup_rows(concepts, (c: ConceptRow) => `${c.type}:${c.cui}`);    
-  }
-  if (drugName === undefined) {
-    const concepts = await fetchConceptsByName(pool, diseaseName);
-    if (concepts.length > 0 && concepts.every(c => c.type === "disease")) {
-      const children = await fetchDiseaseChildren(pool, concepts.map(c => c.cui));
-      return dedup_rows([...concepts, ...children], (c: ConceptRow) => `${c.type}:${c.cui}`);
-    }
-    return dedup_rows(concepts, (c: ConceptRow) => `${c.type}:${c.cui}`);
-  }
-  const concepts = await fetchConceptsByName(pool, drugName);
-  const diseaseConcepts = await fetchConceptsByName(pool, diseaseName);
-  const children = await fetchDiseaseChildren(pool, diseaseConcepts.map(c => c.cui));
-  return dedup_rows([...concepts, ...diseaseConcepts, ...children], (c: ConceptRow) => `${c.type}:${c.cui}`);
+  return timeQuery(
+    'queryConceptsMySql',
+    async () => {
+      if (diseaseName === undefined && drugName === undefined) {
+        return [];
+      }
+      if (diseaseName === undefined) {    
+        const concepts = await fetchConceptsByName(pool, drugName);
+        if (concepts.length > 0 && concepts.every(c => c.type === "disease")) {
+          const children = await fetchDiseaseChildren(pool, concepts.map(c => c.cui));
+          return dedup_rows([...concepts, ...children], (c: ConceptRow) => `${c.type}:${c.cui}`);
+        }
+        return dedup_rows(concepts, (c: ConceptRow) => `${c.type}:${c.cui}`);    
+      }
+      if (drugName === undefined) {
+        const concepts = await fetchConceptsByName(pool, diseaseName);
+        if (concepts.length > 0 && concepts.every(c => c.type === "disease")) {
+          const children = await fetchDiseaseChildren(pool, concepts.map(c => c.cui));
+          return dedup_rows([...concepts, ...children], (c: ConceptRow) => `${c.type}:${c.cui}`);
+        }
+        return dedup_rows(concepts, (c: ConceptRow) => `${c.type}:${c.cui}`);
+      }
+      const concepts = await fetchConceptsByName(pool, drugName);
+      const diseaseConcepts = await fetchConceptsByName(pool, diseaseName);
+      const children = await fetchDiseaseChildren(pool, diseaseConcepts.map(c => c.cui));
+      return dedup_rows([...concepts, ...diseaseConcepts, ...children], (c: ConceptRow) => `${c.type}:${c.cui}`);
+    },
+    { drugName, diseaseName }
+  );
 }
 
 /** Generic: SELECT * FROM <table> WHERE CUI IN (?) ; drop id col; distinct */
@@ -122,15 +141,21 @@ async function fetch_by_cui_list(
   if (cuiList.length === 0) return [];
   // mysql2 expands arrays for IN (?) safely
   const sql = `SELECT * FROM \`${table}\` WHERE CUI IN (${placeholders(cuiList.length)})`;
-  const [rows] = await pool.execute(sql, cuiList);
-  let cleaned: RowDict[];
-  if (dropIdCol) {
-    cleaned = (rows as RowDict[]).map(r => drop_keys(r, [dropIdCol]));
-  } else {
-    cleaned = (rows as RowDict[]);
-  }
-  // dedupe by JSON value after dropping id column (matches R's distinct())
-  return dedup_rows(cleaned, r => JSON.stringify(r));
+  return timeQuery(
+    `fetch_by_cui_list_${table}`,
+    async () => {
+      const [rows] = await pool.execute(sql, cuiList);
+      let cleaned: RowDict[];
+      if (dropIdCol) {
+        cleaned = (rows as RowDict[]).map(r => drop_keys(r, [dropIdCol]));
+      } else {
+        cleaned = (rows as RowDict[]);
+      }
+      // dedupe by JSON value after dropping id column (matches R's distinct())
+      return dedup_rows(cleaned, r => JSON.stringify(r));
+    },
+    { table, cuiCount: cuiList.length, dropIdCol }
+  );
 }
 
 export async function queriedAtcMySql(conceptIds: ConceptRow[]): Promise<RowDict[]> {
@@ -167,75 +192,127 @@ export async function queriedLabelsMySql(conceptIds: ConceptRow[]): Promise<RowD
 export async function queriedPMIDMySql(
   input: QueriedPmidInput
 ): Promise<PmidRow[]> {
-  const { conceptIds, searchType } = input;
+  return timeQuery(
+    'queriedPMIDMySql',
+    async () => {
+      const { conceptIds, searchType } = input;
 
-  if (!Array.isArray(conceptIds) || conceptIds.length === 0) {
-    return []; // equivalent to data.frame(pmid = character(0))
-  }
+      if (!Array.isArray(conceptIds) || conceptIds.length === 0) {
+        return []; // equivalent to data.frame(pmid = character(0))
+      }
 
-  const drugCuis = pick_drug_cuis(conceptIds);
-  const diseaseCuis = pick_disease_cuis(conceptIds);
+      const drugCuis = pick_drug_cuis(conceptIds);
+      const diseaseCuis = pick_disease_cuis(conceptIds);
 
-  const drugSelected = has_drug_selected(searchType) && drugCuis.length > 0;
-  const diseaseSelected = has_disease_selected(searchType) && diseaseCuis.length > 0;
+      const drugSelected = has_drug_selected(searchType) && drugCuis.length > 0;
+      const diseaseSelected = has_disease_selected(searchType) && diseaseCuis.length > 0;
 
-  // Neither selected (unlikely) → empty
-  if (!drugSelected && !diseaseSelected) return [];
+      // Neither selected (unlikely) → empty
+      if (!drugSelected && !diseaseSelected) return [];
 
-  // Build and run the appropriate query
-  if (drugSelected && diseaseSelected) {
-    // PMIDs that have at least one matching DRUG cui AND at least one matching DISEASE cui.
-    // Using INNER JOIN + DISTINCT is equivalent to your LEFT JOIN + HAVING logic.
-    const sql = `
-      SELECT DISTINCT d.pmid
-      FROM new_pmid2drug   AS d
-      JOIN new_pmid2disease AS dis
-        ON dis.pmid = d.pmid
-      WHERE d.cui  IN (${placeholders(drugCuis.length)})
-        AND dis.cui IN (${placeholders(diseaseCuis.length)})
-    `;
-    const [rows] = await pool.execute(sql, [...drugCuis, ...diseaseCuis]);
-    return (rows as any[]).map(r => ({ pmid: String(r.pmid) }));
-  }
+      // Build and run the appropriate query
+      if (drugSelected && diseaseSelected) {
+        // PMIDs that have at least one matching DRUG cui AND at least one matching DISEASE cui.
+        // Using INNER JOIN + DISTINCT is equivalent to your LEFT JOIN + HAVING logic.
+        const sql = `
+          SELECT DISTINCT d.pmid
+          FROM new_pmid2drug   AS d
+          JOIN new_pmid2disease AS dis
+            ON dis.pmid = d.pmid
+          WHERE d.cui  IN (${placeholders(drugCuis.length)})
+            AND dis.cui IN (${placeholders(diseaseCuis.length)})
+        `;
+        const [rows] = await pool.execute(sql, [...drugCuis, ...diseaseCuis]);
+        return (rows as any[]).map(r => ({ pmid: String(r.pmid) }));
+      }
 
-  if (drugSelected) {
-    const sql = `
-      SELECT DISTINCT pmid
-      FROM new_pmid2drug
-      WHERE cui IN (${placeholders(drugCuis.length)})
-    `;
-    const [rows] = await pool.execute(sql, drugCuis);
-    return (rows as any[]).map(r => ({ pmid: String(r.pmid) }));
-  }
+      if (drugSelected) {
+        const sql = `
+          SELECT DISTINCT pmid
+          FROM new_pmid2drug
+          WHERE cui IN (${placeholders(drugCuis.length)})
+        `;
+        const [rows] = await pool.execute(sql, drugCuis);
+        return (rows as any[]).map(r => ({ pmid: String(r.pmid) }));
+      }
 
-  // diseaseSelected only
-  const sql = `
-    SELECT DISTINCT pmid
-    FROM new_pmid2disease
-    WHERE cui IN (${placeholders(diseaseCuis.length)})
-  `;
-  const [rows] = await pool.execute(sql, diseaseCuis);
-  return (rows as any[]).map(r => ({ pmid: String(r.pmid) }));
+      // diseaseSelected only
+      const sql = `
+        SELECT DISTINCT pmid
+        FROM new_pmid2disease
+        WHERE cui IN (${placeholders(diseaseCuis.length)})
+      `;
+      const [rows] = await pool.execute(sql, diseaseCuis);
+      return (rows as any[]).map(r => ({ pmid: String(r.pmid) }));
+    },
+    {
+      conceptCount: input.conceptIds?.length || 0,
+      searchType: Array.isArray(input.searchType) ? input.searchType.join(',') : input.searchType,
+    }
+  );
 }
 
 export const queriedType = async (pmids: string[]) => {
-  if (!pmids || pmids.length === 0) {
-    return [];
-  }
-  const pmidList = pmids;
-  const sql = `
-    SELECT st.pmid,
-        GROUP_CONCAT(DISTINCT st.type SEPARATOR ' / ') AS study_type,
-        GROUP_CONCAT(DISTINCT pop.type SEPARATOR ' / ') AS population
-    FROM new_study_type st
-    LEFT JOIN new_population pop ON st.pmid = pop.pmid
-    WHERE st.pmid IN (${placeholders(pmidList.length)})
-    GROUP BY st.pmid
-  `;
-  
-  const [rows] = await pool.execute(sql, pmidList);
-  return rows as { pmid: string; study_type: string; population: string }[];
+  return timeQuery(
+    'queriedType',
+    async () => {
+      if (!pmids || pmids.length === 0) {
+        return [];
+      }
+      const pmidList = pmids;
+      const sql = `
+        SELECT st.pmid,
+            GROUP_CONCAT(DISTINCT st.type SEPARATOR ' / ') AS study_type,
+            GROUP_CONCAT(DISTINCT pop.type SEPARATOR ' / ') AS population
+        FROM new_study_type st
+        LEFT JOIN new_population pop ON st.pmid = pop.pmid
+        WHERE st.pmid IN (${placeholders(pmidList.length)})
+        GROUP BY st.pmid
+      `;
+      
+      const [rows] = await pool.execute(sql, pmidList);
+      return rows as { pmid: string; study_type: string; population: string }[];
+    },
+    { pmidCount: pmids.length }
+  );
 };
+
+export async function queriedStudyCount(pmidList: string[]): Promise<number> {
+  if (!pmidList || pmidList.length === 0) {
+    return 0;
+  }
+
+  const batchSize = 1000;
+  const totalBatches = Math.ceil(pmidList.length / batchSize);
+  let totalCount = 0;
+
+  for (let i = 0; i < pmidList.length; i += batchSize) {
+    const batch = pmidList.slice(i, i + batchSize);
+    const batchNumber = Math.floor(i / batchSize) + 1;
+
+    const sql = `
+      SELECT COUNT(DISTINCT p.pmid) AS count
+      FROM new_pubmed_records p
+      WHERE p.pmid IN (${placeholders(batch.length)})
+    `;
+
+    const count = await timeBatchedQuery(
+      'queriedStudyCount',
+      async () => {
+        const [rows] = await pool.execute(sql, batch);
+        return (rows as any[])[0]?.count || 0;
+      },
+      batchNumber,
+      totalBatches,
+      batch.length,
+      { totalPmidCount: pmidList.length }
+    );
+
+    totalCount += Number(count);
+  }
+
+  return totalCount;
+}
 
 export async function queriedStudy(pmidList: string[]): Promise<StudyResult[]> {
   if (!pmidList || pmidList.length === 0) {
@@ -243,10 +320,12 @@ export async function queriedStudy(pmidList: string[]): Promise<StudyResult[]> {
   }
 
   const batchSize = 1000;
+  const totalBatches = Math.ceil(pmidList.length / batchSize);
   const results: StudyResult[] = [];
 
   for (let i = 0; i < pmidList.length; i += batchSize) {
     const batch = pmidList.slice(i, i + batchSize);
+    const batchNumber = Math.floor(i / batchSize) + 1;
 
     const sql = `
       SELECT
@@ -264,8 +343,19 @@ export async function queriedStudy(pmidList: string[]): Promise<StudyResult[]> {
       GROUP BY p.pmid
     `;
 
-    const [rows] = await pool.execute(sql, batch);
-    results.push(...(rows as StudyResult[]));
+    const batchResults = await timeBatchedQuery(
+      'queriedStudy',
+      async () => {
+        const [rows] = await pool.execute(sql, batch);
+        return rows as StudyResult[];
+      },
+      batchNumber,
+      totalBatches,
+      batch.length,
+      { totalPmidCount: pmidList.length }
+    );
+
+    results.push(...batchResults);
   }
 
   return results;

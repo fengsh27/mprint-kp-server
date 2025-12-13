@@ -152,11 +152,13 @@ const PublicationTableColumns = [
 
 export interface PublicationTabProps {
   publicationData: PublicationTableRow[];
+  publicationCount?: number | null;
+  isLoading?: boolean;
   // pmidData: PmidRow[];
   // typeData: TypeData[];
 }
 
-export default function PublicationTab({ publicationData }: PublicationTabProps) {
+export default function PublicationTab({ publicationData, publicationCount, isLoading = false }: PublicationTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showEntries, setShowEntries] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
@@ -168,10 +170,23 @@ export default function PublicationTab({ publicationData }: PublicationTabProps)
     )
   );
 
-  const totalPages = Math.ceil(filteredData.length / showEntries);
+  // Use count from props if available and data is loading, otherwise use filtered data length
+  const displayCount = (isLoading && publicationCount !== null && publicationCount !== undefined) ? publicationCount : filteredData.length;
+  const totalPages = Math.ceil(displayCount / showEntries);
   const startIndex = (currentPage - 1) * showEntries;
   const endIndex = startIndex + showEntries;
   const paginatedData = filteredData.slice(startIndex, endIndex);
+  
+  // Create placeholder data for loading state
+  const placeholderData: PublicationTableRow[] = Array(Math.min(showEntries, displayCount)).fill(null).map((_, i) => ({
+    PMID: '',
+    Year: '',
+    Title: 'Loading...',
+    StudyType: '',
+    Population: '',
+    StudiedDrugs: '',
+    StudiedDiseases: '',
+  }));
 
   // useEffect(() => {
   //   daGetStudy(pmidData).then((data: any) => {
@@ -181,7 +196,11 @@ export default function PublicationTab({ publicationData }: PublicationTabProps)
   //   });
   // }, [pmidData, typeData]);
 
-  if (publicationData.length === 0) {
+  // Show loading state with placeholder if we have a count but no data yet
+  const showPlaceholder = isLoading && publicationCount !== null && publicationCount !== undefined && publicationCount > 0;
+  const showEmptyState = !isLoading && publicationData.length === 0;
+  
+  if (showEmptyState) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -232,27 +251,31 @@ export default function PublicationTab({ publicationData }: PublicationTabProps)
       <div className="min-h-[600px]">
         <DataGrid 
           columns={PublicationTableColumns} 
-          rows={paginatedData} 
+          rows={showPlaceholder ? placeholderData : paginatedData} 
           className="rdg-light"
           style={{height: '100%'}}
           defaultColumnOptions={{
             resizable: true,
-            sortable: true,
+            sortable: !showPlaceholder,
           }}
           rowHeight={80}
         />
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {(totalPages > 1 || (isLoading && publicationCount !== null && publicationCount !== undefined && publicationCount > 0)) && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} entries
+            {isLoading && publicationCount !== null && publicationCount !== undefined ? (
+              `Showing ${startIndex + 1} to ${Math.min(endIndex, publicationCount)} of ${publicationCount} entries`
+            ) : (
+              `Showing ${startIndex + 1} to ${Math.min(endIndex, filteredData.length)} of ${filteredData.length} entries`
+            )}
           </div>
           <div className="flex space-x-1">
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
+              disabled={currentPage === 1 || isLoading}
               className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               Previous
@@ -270,11 +293,12 @@ export default function PublicationTab({ publicationData }: PublicationTabProps)
                     <button
                       key={i}
                       onClick={() => setCurrentPage(i)}
+                      disabled={isLoading}
                       className={`px-3 py-1 text-sm border rounded ${
                         currentPage === i
                           ? 'bg-blue-600 text-white border-blue-600'
                           : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
+                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {i}
                     </button>
@@ -290,11 +314,12 @@ export default function PublicationTab({ publicationData }: PublicationTabProps)
                   <button
                     key={1}
                     onClick={() => setCurrentPage(1)}
+                    disabled={isLoading}
                     className={`px-3 py-1 text-sm border rounded ${
                       currentPage === 1
                         ? 'bg-blue-600 text-white border-blue-600'
                         : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                    }`}
+                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     1
                   </button>
@@ -316,11 +341,12 @@ export default function PublicationTab({ publicationData }: PublicationTabProps)
                       <button
                         key={i}
                         onClick={() => setCurrentPage(i)}
+                        disabled={isLoading}
                         className={`px-3 py-1 text-sm border rounded ${
                           currentPage === i
                             ? 'bg-blue-600 text-white border-blue-600'
                             : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                        }`}
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {i}
                       </button>
@@ -343,11 +369,12 @@ export default function PublicationTab({ publicationData }: PublicationTabProps)
                     <button
                       key={totalPages}
                       onClick={() => setCurrentPage(totalPages)}
+                      disabled={isLoading}
                       className={`px-3 py-1 text-sm border rounded ${
                         currentPage === totalPages
                           ? 'bg-blue-600 text-white border-blue-600'
                           : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                      }`}
+                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {totalPages}
                     </button>
@@ -360,7 +387,7 @@ export default function PublicationTab({ publicationData }: PublicationTabProps)
             
             <button
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
+              disabled={currentPage === totalPages || isLoading}
               className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               Next

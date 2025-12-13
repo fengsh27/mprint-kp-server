@@ -1,7 +1,7 @@
-// app/api/type_population/route.ts
+// app/api/study/count/route.ts
 import { NextResponse } from "next/server";
-import { queriedStudy } from "../../libs/database/query_db";
-import { withRateLimit, searchRateLimiter } from "../../libs/middleware/rateLimiter";
+import { queriedStudyCount } from "../../../libs/database/query_db";
+import { withRateLimit, searchRateLimiter } from "../../../libs/middleware/rateLimiter";
 import { 
   InputValidator, 
   addSecurityHeaders, 
@@ -9,10 +9,10 @@ import {
   detectSQLInjection,
   sanitizeInput,
   logSecurityEvent 
-} from "../../libs/middleware/security";
-import { MAX_QUERIED_ARRAY_LENGTH } from "../../libs/constants";
+} from "../../../libs/middleware/security";
+import { MAX_QUERIED_ARRAY_LENGTH } from "../../../libs/constants";
 
-async function studyHandler(req: Request) {
+async function studyCountHandler(req: Request) {
   const requestStartTime = performance.now();
   
   // Validate request size
@@ -89,7 +89,7 @@ async function studyHandler(req: Request) {
     const pmids = body.map((item: any) => item.pmid);
     const sanitizedPmids = sanitizeInput(pmids);
 
-    const rows = await queriedStudy(sanitizedPmids);
+    const count = await queriedStudyCount(sanitizedPmids);
     
     const requestEndTime = performance.now();
     const requestDurationMs = requestEndTime - requestStartTime;
@@ -97,21 +97,21 @@ async function studyHandler(req: Request) {
     // Log successful query
     logSecurityEvent(req as any, 'SUCCESSFUL_QUERY', { 
       pmidCount: pmids.length,
-      resultCount: rows.length,
+      resultCount: count,
       requestDurationMs: Math.round(requestDurationMs * 100) / 100
     });
 
-    const response = NextResponse.json(rows);
+    const response = NextResponse.json({ count });
     return addSecurityHeaders(response);
 
   } catch (error) {
-    console.error('Error in study API:', error);
+    console.error('Error in study count API:', error);
     logSecurityEvent(req as any, 'DATABASE_ERROR', { error: error instanceof Error ? error.message : String(error) });
     
     return NextResponse.json(
       { 
         error: 'Internal Server Error',
-        message: 'Failed to fetch study data'
+        message: 'Failed to fetch study count'
       },
       { status: 500 }
     );
@@ -119,4 +119,5 @@ async function studyHandler(req: Request) {
 }
 
 // Export with rate limiting
-export const POST = withRateLimit(studyHandler, searchRateLimiter);
+export const POST = withRateLimit(studyCountHandler, searchRateLimiter);
+

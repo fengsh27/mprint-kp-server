@@ -15,8 +15,11 @@ import {
   sanitizeInput,
   logSecurityEvent 
 } from "../../libs/middleware/security";
+import { timeQuery } from "../../libs/database/query_timer";
 
 async function conceptsHandler(req: Request) {
+  const requestStartTime = performance.now();
+  
   // Validate request size
   const sizeValidation = validateRequestSize(req as any, 1); // 1MB max for GET requests
   if (!sizeValidation.valid) {
@@ -82,11 +85,15 @@ async function conceptsHandler(req: Request) {
   try {
     const rows = await queryConceptsMySql(pool, inputs);
     
+    const requestEndTime = performance.now();
+    const requestDurationMs = requestEndTime - requestStartTime;
+    
     // Log successful query
     logSecurityEvent(req as any, 'SUCCESSFUL_QUERY', { 
       drugName: inputs.drugName, 
       diseaseName: inputs.diseaseName,
-      resultCount: rows.length 
+      resultCount: rows.length,
+      requestDurationMs: Math.round(requestDurationMs * 100) / 100
     });
 
     const response = NextResponse.json(rows);

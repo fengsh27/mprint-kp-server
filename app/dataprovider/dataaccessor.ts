@@ -44,6 +44,9 @@ export const daGetTypePopulation = (pmids: PmidRow[], opts?: { signal?: AbortSig
 export const daGetStudy = (pmids: PmidRow[], opts?: { signal?: AbortSignal }) =>
   api.post<unknown>("/api/study", pmids, opts);
 
+export const daGetStudyCount = (pmids: PmidRow[], opts?: { signal?: AbortSignal }) =>
+  api.post<unknown>("/api/study/count", pmids, opts);
+
 export const daPostTest = (opts?: { signal?: AbortSignal }) =>
   api.post<unknown>("/api/test", undefined, opts);
 
