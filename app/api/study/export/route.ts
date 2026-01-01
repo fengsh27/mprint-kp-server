@@ -200,7 +200,7 @@ async function studyExportHandler(req: Request) {
       format
     });
 
-    const response = new NextResponse(content, {
+    const response = new NextResponse(content as any, {
       headers: {
         "Content-Type": contentType,
         "Content-Disposition": `attachment; filename="${filename}"`
