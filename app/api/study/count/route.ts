@@ -12,6 +12,40 @@ import {
 } from "../../../libs/middleware/security";
 import { MAX_QUERIED_ARRAY_LENGTH } from "../../../libs/constants";
 
+const STUDY_COUNT_CACHE_TTL_MS = 5 * 60 * 1000;
+const STUDY_COUNT_CACHE_MAX = 50;
+const studyCountCache = new Map<string, { timestamp: number; count: number }>();
+
+function hashPmids(pmids: string[]): string {
+  let hash = 5381;
+  for (const pmid of pmids) {
+    for (let i = 0; i < pmid.length; i += 1) {
+      hash = (hash * 33) ^ pmid.charCodeAt(i);
+    }
+  }
+  return `${hash >>> 0}-${pmids.length}`;
+}
+
+function getCachedCount(key: string) {
+  const cached = studyCountCache.get(key);
+  if (!cached) return undefined;
+  if (Date.now() - cached.timestamp > STUDY_COUNT_CACHE_TTL_MS) {
+    studyCountCache.delete(key);
+    return undefined;
+  }
+  return cached.count;
+}
+
+function setCachedCount(key: string, count: number) {
+  studyCountCache.set(key, { timestamp: Date.now(), count });
+  if (studyCountCache.size > STUDY_COUNT_CACHE_MAX) {
+    const oldestKey = studyCountCache.keys().next().value;
+    if (oldestKey) {
+      studyCountCache.delete(oldestKey);
+    }
+  }
+}
+
 async function studyCountHandler(req: Request) {
   const requestStartTime = performance.now();
   
@@ -89,7 +123,12 @@ async function studyCountHandler(req: Request) {
     const pmids = body.map((item: any) => item.pmid);
     const sanitizedPmids = sanitizeInput(pmids);
 
-    const count = await queriedStudyCount(sanitizedPmids);
+    const cacheKey = hashPmids(sanitizedPmids);
+    const cachedCount = getCachedCount(cacheKey);
+    const count = cachedCount ?? (await queriedStudyCount(sanitizedPmids));
+    if (cachedCount === undefined) {
+      setCachedCount(cacheKey, Number(count));
+    }
     
     const requestEndTime = performance.now();
     const requestDurationMs = requestEndTime - requestStartTime;
@@ -120,4 +159,3 @@ async function studyCountHandler(req: Request) {
 
 // Export with rate limiting
 export const POST = withRateLimit(studyCountHandler, searchRateLimiter);
-

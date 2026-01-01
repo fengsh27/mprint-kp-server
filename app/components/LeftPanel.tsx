@@ -21,12 +21,11 @@ interface LeftPanelProps {
   onDrugClassLevelChange: (level: 1 | 2 | 3) => void;
   onSearch: () => void;
   onClearAll: () => void;
-  publicationData: any[];
   downloadType: 'xlsx' | 'csv' | 'tsv';
   onDownloadTypeChange: (type: 'xlsx' | 'csv' | 'tsv') => void;
   onDownload: () => void;
+  isExporting: boolean;
   pmidData: any[];
-  typeData: any[];
   sidebarExpanded: boolean;
   onSidebarToggle: () => void;
 }
@@ -48,12 +47,11 @@ export default function LeftPanel({
   onDrugClassLevelChange,
   onSearch,
   onClearAll,
-  publicationData,
   downloadType,
   onDownloadTypeChange,
   onDownload,
+  isExporting,
   pmidData,
-  typeData,
   sidebarExpanded,
   onSidebarToggle,
 }: LeftPanelProps) {
@@ -307,7 +305,7 @@ export default function LeftPanel({
               
               <Accordion.Content className="px-3 pb-3">
                 <div className="pt-2 space-y-3">
-                  {(!publicationData || publicationData.length === 0) && (
+                  {(!pmidData || pmidData.length === 0) && (
                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
@@ -327,7 +325,7 @@ export default function LeftPanel({
                         name="download-format" 
                         value="excel" 
                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                        disabled={!publicationData || publicationData.length === 0}
+                        disabled={!pmidData || pmidData.length === 0}
                         checked={downloadType === 'xlsx'}
                         onChange={() => onDownloadTypeChange('xlsx')}
                       />
@@ -339,7 +337,7 @@ export default function LeftPanel({
                         name="download-format" 
                         value="csv" 
                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                        disabled={!publicationData || publicationData.length === 0}
+                        disabled={!pmidData || pmidData.length === 0}
                         checked={downloadType === 'csv'}
                         onChange={() => onDownloadTypeChange('csv')}
                       />
@@ -351,7 +349,7 @@ export default function LeftPanel({
                         name="download-format" 
                         value="tsv" 
                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                        disabled={!publicationData || publicationData.length === 0}
+                        disabled={!pmidData || pmidData.length === 0}
                         checked={downloadType === 'tsv'}
                         onChange={() => onDownloadTypeChange('tsv')}
                       />
@@ -361,14 +359,14 @@ export default function LeftPanel({
                   <div className="pt-3">
                     <button 
                       className={`w-full py-2 px-4 rounded-md transition-colors ${
-                        (!pmidData || pmidData.length === 0 || !typeData || typeData.length === 0)
+                        (!pmidData || pmidData.length === 0 || isExporting)
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : 'bg-blue-600 text-white hover:bg-blue-700'
                       }`}
-                      disabled={!publicationData || publicationData.length === 0}
+                      disabled={!pmidData || pmidData.length === 0 || isExporting}
                       onClick={onDownload}
                     >
-                      Download
+                      {isExporting ? 'Preparing download...' : 'Download'}
                     </button>
                   </div>
                 </div>
@@ -390,4 +388,3 @@ export default function LeftPanel({
     </div>
   );
 }
-

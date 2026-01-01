@@ -153,16 +153,39 @@ const PublicationTableColumns = [
 export interface PublicationTabProps {
   publicationData: PublicationTableRow[];
   publicationCount?: number | null;
+  estimatedCount?: number | null;
   isLoading?: boolean;
-  // pmidData: PmidRow[];
-  // typeData: TypeData[];
+  currentPage?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
+  serverSide?: boolean;
 }
 
-export default function PublicationTab({ publicationData, publicationCount, isLoading = false }: PublicationTabProps) {
+export default function PublicationTab({
+  publicationData,
+  publicationCount,
+  estimatedCount,
+  isLoading = false,
+  currentPage,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+  serverSide = false
+}: PublicationTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showEntries, setShowEntries] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [localPage, setLocalPage] = useState(1);
   // const [publicationData, setPublicationData] = useState<PublicationTableRow[]>([]);
+
+  const isServerSide =
+    serverSide &&
+    typeof currentPage === 'number' &&
+    typeof pageSize === 'number' &&
+    typeof onPageChange === 'function' &&
+    typeof onPageSizeChange === 'function';
+  const effectivePage = isServerSide ? currentPage : localPage;
+  const effectivePageSize = isServerSide ? pageSize : showEntries;
 
   const filteredData = publicationData.filter(item =>
     Object.values(item).some(value =>
@@ -170,15 +193,24 @@ export default function PublicationTab({ publicationData, publicationCount, isLo
     )
   );
 
-  // Use count from props if available and data is loading, otherwise use filtered data length
-  const displayCount = (isLoading && publicationCount !== null && publicationCount !== undefined) ? publicationCount : filteredData.length;
-  const totalPages = Math.ceil(displayCount / showEntries);
-  const startIndex = (currentPage - 1) * showEntries;
-  const endIndex = startIndex + showEntries;
-  const paginatedData = filteredData.slice(startIndex, endIndex);
+  const fallbackCount =
+    estimatedCount !== null && estimatedCount !== undefined
+      ? estimatedCount
+      : isLoading
+        ? effectivePageSize
+        : filteredData.length;
+  const displayCount =
+    publicationCount !== null && publicationCount !== undefined
+      ? publicationCount
+      : fallbackCount;
+  const totalPages = Math.max(1, Math.ceil(displayCount / effectivePageSize));
+  const startIndex = (effectivePage - 1) * effectivePageSize;
+  const endIndex = startIndex + effectivePageSize;
+  const paginatedData = isServerSide ? filteredData : filteredData.slice(startIndex, endIndex);
   
   // Create placeholder data for loading state
-  const placeholderData: PublicationTableRow[] = Array(Math.min(showEntries, displayCount)).fill(null).map((_, i) => ({
+  const placeholderCount = Math.min(effectivePageSize, displayCount || effectivePageSize);
+  const placeholderData: PublicationTableRow[] = Array(placeholderCount).fill(null).map((_, i) => ({
     PMID: '',
     Year: '',
     Title: 'Loading...',
@@ -197,8 +229,33 @@ export default function PublicationTab({ publicationData, publicationCount, isLo
   // }, [pmidData, typeData]);
 
   // Show loading state with placeholder if we have a count but no data yet
-  const showPlaceholder = isLoading && publicationCount !== null && publicationCount !== undefined && publicationCount > 0;
+  const showPlaceholder = isLoading;
+  const totalEntries = publicationCount ?? fallbackCount;
+  const showCountingLabel = publicationCount === null || publicationCount === undefined;
+  const showingEnd = isLoading
+    ? Math.min(startIndex + effectivePageSize, totalEntries)
+    : isServerSide
+      ? Math.min(startIndex + paginatedData.length, totalEntries)
+      : Math.min(endIndex, totalEntries);
   const showEmptyState = !isLoading && publicationData.length === 0;
+
+  const handlePageChange = (page: number) => {
+    if (isServerSide) {
+      onPageChange?.(page);
+    } else {
+      setLocalPage(page);
+    }
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    if (isServerSide) {
+      onPageSizeChange?.(size);
+      onPageChange?.(1);
+    } else {
+      setShowEntries(size);
+      setLocalPage(1);
+    }
+  };
   
   if (showEmptyState) {
     return (
@@ -220,10 +277,9 @@ export default function PublicationTab({ publicationData, publicationCount, isLo
         <div className="flex items-center space-x-2">
           <label className="text-sm text-gray-600">Show</label>
           <select
-            value={showEntries}
+            value={effectivePageSize}
             onChange={(e) => {
-              setShowEntries(Number(e.target.value));
-              setCurrentPage(1);
+              handlePageSizeChange(Number(e.target.value));
             }}
             className="border border-gray-300 rounded px-2 py-1 text-sm"
           >
@@ -263,19 +319,17 @@ export default function PublicationTab({ publicationData, publicationCount, isLo
       </div>
 
       {/* Pagination */}
-      {(totalPages > 1 || (isLoading && publicationCount !== null && publicationCount !== undefined && publicationCount > 0)) && (
+          {(totalPages > 1 || (isLoading && publicationCount !== null && publicationCount !== undefined && publicationCount > 0)) && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            {isLoading && publicationCount !== null && publicationCount !== undefined ? (
-              `Showing ${startIndex + 1} to ${Math.min(endIndex, publicationCount)} of ${publicationCount} entries`
-            ) : (
-              `Showing ${startIndex + 1} to ${Math.min(endIndex, filteredData.length)} of ${filteredData.length} entries`
-            )}
+            {showCountingLabel
+              ? `Showing ${startIndex + 1} to ${showingEnd} entries (counting the number of publications...)`
+              : `Showing ${startIndex + 1} to ${showingEnd} of ${totalEntries} entries`}
           </div>
           <div className="flex space-x-1">
             <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1 || isLoading}
+              onClick={() => handlePageChange(Math.max(1, effectivePage - 1))}
+              disabled={effectivePage === 1 || isLoading}
               className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               Previous
@@ -292,10 +346,10 @@ export default function PublicationTab({ publicationData, publicationCount, isLo
                   pages.push(
                     <button
                       key={i}
-                      onClick={() => setCurrentPage(i)}
+                      onClick={() => handlePageChange(i)}
                       disabled={isLoading}
                       className={`px-3 py-1 text-sm border rounded ${
-                        currentPage === i
+                        effectivePage === i
                           ? 'bg-blue-600 text-white border-blue-600'
                           : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                       } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -306,17 +360,17 @@ export default function PublicationTab({ publicationData, publicationCount, isLo
                 }
               } else {
                 // Smart pagination with ellipsis
-                const leftBound = Math.max(1, currentPage - 2);
-                const rightBound = Math.min(totalPages, currentPage + 2);
+                const leftBound = Math.max(1, effectivePage - 2);
+                const rightBound = Math.min(totalPages, effectivePage + 2);
                 
                 // Always show first page
                 pages.push(
                   <button
                     key={1}
-                    onClick={() => setCurrentPage(1)}
+                    onClick={() => handlePageChange(1)}
                     disabled={isLoading}
                     className={`px-3 py-1 text-sm border rounded ${
-                      currentPage === 1
+                      effectivePage === 1
                         ? 'bg-blue-600 text-white border-blue-600'
                         : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                     } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -340,10 +394,10 @@ export default function PublicationTab({ publicationData, publicationCount, isLo
                     pages.push(
                       <button
                         key={i}
-                        onClick={() => setCurrentPage(i)}
+                        onClick={() => handlePageChange(i)}
                         disabled={isLoading}
                         className={`px-3 py-1 text-sm border rounded ${
-                          currentPage === i
+                          effectivePage === i
                             ? 'bg-blue-600 text-white border-blue-600'
                             : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                         } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -368,10 +422,10 @@ export default function PublicationTab({ publicationData, publicationCount, isLo
                   pages.push(
                     <button
                       key={totalPages}
-                      onClick={() => setCurrentPage(totalPages)}
+                      onClick={() => handlePageChange(totalPages)}
                       disabled={isLoading}
                       className={`px-3 py-1 text-sm border rounded ${
-                        currentPage === totalPages
+                        effectivePage === totalPages
                           ? 'bg-blue-600 text-white border-blue-600'
                           : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                       } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -386,8 +440,8 @@ export default function PublicationTab({ publicationData, publicationCount, isLo
             })()}
             
             <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages || isLoading}
+              onClick={() => handlePageChange(Math.min(totalPages, effectivePage + 1))}
+              disabled={effectivePage === totalPages || isLoading}
               className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               Next
