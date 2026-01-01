@@ -41,11 +41,61 @@ export const daGetPMIDs = (conceptIds: ConceptRow[], searchType: SearchType, opt
 export const daGetTypePopulation = (pmids: PmidRow[], opts?: { signal?: AbortSignal }) =>
   api.post<unknown>("/api/type_population", pmids, opts);
 
-export const daGetStudy = (pmids: PmidRow[], opts?: { signal?: AbortSignal }) =>
-  api.post<unknown>("/api/study", pmids, opts);
+export type StudyRequestOptions = {
+  signal?: AbortSignal;
+  limit?: number;
+  offset?: number;
+};
+
+export const daGetStudy = (pmids: PmidRow[], opts?: StudyRequestOptions) => {
+  const { signal, limit, offset } = opts ?? {};
+  const hasPagination = typeof limit === "number" || typeof offset === "number";
+  const body = hasPagination ? { pmids, limit, offset } : pmids;
+  return api.post<unknown>("/api/study", body, { signal });
+};
 
 export const daGetStudyCount = (pmids: PmidRow[], opts?: { signal?: AbortSignal }) =>
   api.post<unknown>("/api/study/count", pmids, opts);
+
+export type ExportFormat = "xlsx" | "csv" | "tsv";
+
+function getFilenameFromDisposition(disposition: string | null): string | undefined {
+  if (!disposition) return undefined;
+  const match = disposition.match(/filename="([^"]+)"/);
+  return match?.[1];
+}
+
+export const daExportStudy = async (
+  pmids: PmidRow[],
+  format: ExportFormat,
+  opts?: { signal?: AbortSignal }
+) => {
+  const response = await fetch("/api/study/export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pmids, format }),
+    signal: opts?.signal
+  });
+
+  if (!response.ok) {
+    let message = `Request failed: ${response.status} ${response.statusText}`;
+    try {
+      const data = await response.json();
+      if (data?.message) {
+        message = data.message;
+      }
+    } catch (error) {
+      // Ignore non-JSON responses.
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  const filename =
+    getFilenameFromDisposition(response.headers.get("content-disposition")) ??
+    `publication_table.${format}`;
+  return { blob, filename };
+};
 
 export const daPostTest = (opts?: { signal?: AbortSignal }) =>
   api.post<unknown>("/api/test", undefined, opts);
@@ -72,5 +122,3 @@ export const daGetDrugClassListByLevel = (
   level: 1 | 2 | 3,
   opts?: { signal?: AbortSignal }
 ) => api.get<unknown>(`/api/drug_class/list/${level}`, opts);
-
-

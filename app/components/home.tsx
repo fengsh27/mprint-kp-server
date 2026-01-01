@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { BarChart3 } from 'lucide-react';
 import Image from 'next/image';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -23,6 +23,7 @@ import {
   daGetTypePopulation,
   daGetDrugClassList,
   daGetDrugClassListByLevel,
+  daExportStudy,
 } from "../dataprovider/dataaccessor";
 import {
   ConceptRow,
@@ -32,18 +33,15 @@ import {
   TypeData
 } from '../libs/database/types';
 import { calculateSummaryStats, preparePlotData, preparePopulationData } from '../libs/dataprocessor/utils';
-import {
-  buildPublicationTable,
-  downloadPublicationTableAsCsv,
-  downloadPublicationTableAsTsv,
-  downloadPublicationTableAsXlsx,
-  PublicationTableRow
-} from './component-utils';
+import { buildPublicationTable, PublicationTableRow } from './component-utils';
 
 
 
 const DEFAULT_LOGO_WIDTH = 150;
 const DEFAULT_LOGO_HEIGHT = 182;
+const DEFAULT_PUBLICATION_PAGE_SIZE = 25;
+const PUBLICATION_CACHE_LIMIT = 5;
+const PUBLICATION_PAGE_CACHE_LIMIT = 20;
 
 const logoSize = {
   w: 100,
@@ -132,6 +130,17 @@ function calculatePlotData(populationData: any[]) {
   };
 }
 
+function hashPmids(pmids: PmidRow[]) {
+  let hash = 5381;
+  for (const item of pmids) {
+    const pmid = item.pmid ?? '';
+    for (let i = 0; i < pmid.length; i += 1) {
+      hash = (hash * 33) ^ pmid.charCodeAt(i);
+    }
+  }
+  return `${hash >>> 0}-${pmids.length}`;
+}
+
 function isQueryStateValid(queryState: any) {
   return queryState && queryState.length > 0;
 }
@@ -169,8 +178,23 @@ export default function Home() {
   const [publicationData, setPublicationData] = useState<PublicationTableRow[]>([]);
   const [publicationCount, setPublicationCount] = useState<number | null>(null);
   const [isLoadingPublications, setIsLoadingPublications] = useState(false);
+  const [publicationPage, setPublicationPage] = useState(1);
+  const [publicationPageSize, setPublicationPageSize] = useState(DEFAULT_PUBLICATION_PAGE_SIZE);
   const [isLoadingPopulationData, setIsLoadingPopulationData] = useState(false);
   const [downloadType, setDownloadType] = useState<'xlsx' | 'csv' | 'tsv'>('xlsx');
+  const [isExporting, setIsExporting] = useState(false);
+
+  const studyCacheRef = useRef(
+    new Map<string, { count: number | null; pages: Map<string, StudyData[]> }>()
+  );
+  const previousPmidKeyRef = useRef<string>('');
+
+  const pmidKey = useMemo(() => {
+    if (!pmidData || pmidData.length === 0) {
+      return '';
+    }
+    return hashPmids(pmidData);
+  }, [pmidData]);
 
   const [overallStudyType, setOverallStudyType] = useState({
     pk: {
@@ -334,35 +358,85 @@ export default function Home() {
       return;
     }
 
+    if (previousPmidKeyRef.current !== pmidKey) {
+      previousPmidKeyRef.current = pmidKey;
+      setPublicationData([]);
+      setPublicationCount(null);
+      setIsLoadingPublications(false);
+      if (publicationPage !== 1) {
+        setPublicationPage(1);
+        return;
+      }
+    }
+
     const controller = new AbortController();
     const { signal } = controller;
     let isActive = true;
 
+    const cache = studyCacheRef.current;
+    let entry = cache.get(pmidKey);
+    if (!entry) {
+      entry = { count: null, pages: new Map() };
+      cache.set(pmidKey, entry);
+      if (cache.size > PUBLICATION_CACHE_LIMIT) {
+        const oldestKey = cache.keys().next().value;
+        if (oldestKey) {
+          cache.delete(oldestKey);
+        }
+      }
+    }
+
+    if (entry.count !== null) {
+      setPublicationCount(entry.count);
+    }
+
+    const pageKey = `${publicationPage}-${publicationPageSize}`;
+    const cachedPage = entry.pages.get(pageKey);
+    if (cachedPage) {
+      const publicationData = buildPublicationTable(cachedPage, typeData);
+      setPublicationData(publicationData);
+      setIsLoadingPublications(false);
+      return () => {
+        isActive = false;
+        controller.abort();
+      };
+    }
+
     setIsLoadingPublications(true);
     setPublicationData([]);
 
-    // Fetch count and data in parallel; render count as soon as it arrives.
-    console.log(" [fengsh] start to get study count", new Date().toISOString());
-    daGetStudyCount(pmidData, { signal })
-      .then((response: any) => {
-        if (!isActive) return;
-        console.log("[fengsh] end to get study count", new Date().toISOString());
-        console.log("get study count: ", response?.count ?? 0, new Date().toISOString());
-        const count = response?.count ?? 0;
-        setPublicationCount(count);
-      })
-      .catch((error: any) => {
-        if (!isActive || error?.name === "AbortError") return;
-        console.error("Error fetching study count:", error);
-        setIsLoadingPublications(false);
-      });
+    const offset = (publicationPage - 1) * publicationPageSize;
 
-    console.log("[fengsh] start to get study data", new Date().toISOString());
-    daGetStudy(pmidData, { signal })
+    if (entry.count === null) {
+      console.log("get study count", new Date().toISOString());
+      daGetStudyCount(pmidData, { signal })
+        .then((response: any) => {
+          if (!isActive) return;
+          console.log("get study count: ", response?.count ?? 0, new Date().toISOString());
+          const count = response?.count ?? 0;
+          if (entry) {
+            entry.count = count;
+          }
+          setPublicationCount(count);
+        })
+        .catch((error: any) => {
+          if (!isActive || error?.name === "AbortError") return;
+          console.error("Error fetching study count:", error);
+        });
+    }
+
+    daGetStudy(pmidData, { signal, limit: publicationPageSize, offset })
       .then((data: any) => {
         if (!isActive) return;
-        console.log("[fengsh] end to get study data", new Date().toISOString());
+        console.log("got study data", new Date().toISOString());
         const studyData = data as StudyData[];
+        entry?.pages.set(pageKey, studyData);
+        if (entry && entry.pages.size > PUBLICATION_PAGE_CACHE_LIMIT) {
+          const oldestPageKey = entry.pages.keys().next().value;
+          if (oldestPageKey) {
+            entry.pages.delete(oldestPageKey);
+          }
+        }
         const publicationData = buildPublicationTable(studyData, typeData);
         setPublicationData(publicationData);
         setIsLoadingPublications(false);
@@ -377,7 +451,7 @@ export default function Home() {
       isActive = false;
       controller.abort();
     };
-  }, [pmidData, typeData]);
+  }, [pmidData, typeData, pmidKey, publicationPage, publicationPageSize]);
 
   // Handle window resize for responsive charts
   useEffect(() => {
@@ -569,16 +643,24 @@ export default function Home() {
     setActiveTab('overview');
   }
 
-  function handleDownload() {
-    if (!publicationData || publicationData.length === 0) {
+  async function handleDownload() {
+    if (!pmidData || pmidData.length === 0 || isExporting) {
       return;
     }
-    if (downloadType === 'xlsx') {
-      downloadPublicationTableAsXlsx(publicationData);
-    } else if (downloadType === 'csv') {
-      downloadPublicationTableAsCsv(publicationData);
-    } else if (downloadType === 'tsv') {
-      downloadPublicationTableAsTsv(publicationData);
+    setIsExporting(true);
+    try {
+      const { blob, filename } = await daExportStudy(pmidData, downloadType);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      console.error('Error exporting publication data:', error);
+    } finally {
+      setIsExporting(false);
     }
   }
 
@@ -630,12 +712,11 @@ export default function Home() {
           onDrugClassLevelChange={handleDrugClassLevelChange}
           onSearch={handleSearch}
           onClearAll={clearAllSearch}
-          publicationData={publicationData}
           downloadType={downloadType}
           onDownloadTypeChange={setDownloadType}
           onDownload={handleDownload}
+          isExporting={isExporting}
           pmidData={pmidData}
-          typeData={typeData}
           sidebarExpanded={sidebarExpanded}
           onSidebarToggle={() => setSidebarExpanded(!sidebarExpanded)}
         />
@@ -756,7 +837,13 @@ export default function Home() {
                   <PublicationTab
                     publicationData={publicationData}
                     publicationCount={publicationCount}
+                    estimatedCount={pmidData.length}
                     isLoading={isLoadingPublications}
+                    currentPage={publicationPage}
+                    pageSize={publicationPageSize}
+                    onPageChange={setPublicationPage}
+                    onPageSizeChange={setPublicationPageSize}
+                    serverSide
                   />
                 )}
               </Tabs.Content>
