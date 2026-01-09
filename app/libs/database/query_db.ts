@@ -1,12 +1,12 @@
 import { Pool } from "mysql2/promise";
 
 import pool from "./silverdb";
-import { 
-  RowDict, 
-  ConceptRow, 
-  QueryInputs, 
-  QueriedPmidInput, 
-  PmidRow, 
+import {
+  RowDict,
+  ConceptRow,
+  QueryInputs,
+  QueriedPmidInput,
+  PmidRow,
   SearchType,
   StudyResult,
 } from "./types";
@@ -106,13 +106,13 @@ export async function queryConceptsMySql(
       if (diseaseName === undefined && drugName === undefined) {
         return [];
       }
-      if (diseaseName === undefined) {    
+      if (diseaseName === undefined) {
         const concepts = await fetchConceptsByName(pool, drugName);
         if (concepts.length > 0 && concepts.every(c => c.type === "disease")) {
           const children = await fetchDiseaseChildren(pool, concepts.map(c => c.cui));
           return dedup_rows([...concepts, ...children], (c: ConceptRow) => `${c.type}:${c.cui}`);
         }
-        return dedup_rows(concepts, (c: ConceptRow) => `${c.type}:${c.cui}`);    
+        return dedup_rows(concepts, (c: ConceptRow) => `${c.type}:${c.cui}`);
       }
       if (drugName === undefined) {
         const concepts = await fetchConceptsByName(pool, diseaseName);
@@ -267,9 +267,10 @@ export const queriedType = async (pmids: string[]) => {
         FROM new_study_type st
         LEFT JOIN new_population pop ON st.pmid = pop.pmid
         WHERE st.pmid IN (${placeholders(pmidList.length)})
+        AND st.type in ('PK', 'PE', 'CT')
         GROUP BY st.pmid
       `;
-      
+
       const [rows] = await pool.execute(sql, pmidList);
       return rows as { pmid: string; study_type: string; population: string }[];
     },

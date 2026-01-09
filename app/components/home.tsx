@@ -386,9 +386,7 @@ export default function Home() {
       }
     }
 
-    if (entry.count !== null) {
-      setPublicationCount(entry.count);
-    }
+    setPublicationCount(typeData?.length ?? 0);
 
     const pageKey = `${publicationPage}-${publicationPageSize}`;
     const cachedPage = entry.pages.get(pageKey);
@@ -417,7 +415,6 @@ export default function Home() {
           if (entry) {
             entry.count = count;
           }
-          setPublicationCount(count);
         })
         .catch((error: any) => {
           if (!isActive || error?.name === "AbortError") return;
@@ -439,6 +436,8 @@ export default function Home() {
         }
         const publicationData = buildPublicationTable(studyData, typeData);
         setPublicationData(publicationData);
+        console.log("[ln446] set publication count", typeData?.length ?? 0);
+        setPublicationCount(typeData?.length ?? 0);
         setIsLoadingPublications(false);
       })
       .catch((error: any) => {
