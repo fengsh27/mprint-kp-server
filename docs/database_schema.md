@@ -53,3 +53,10 @@
 | MOA   | varchar(1024) | YES  |     | NULL    |                |
 | type  | varchar(50)   | YES  |     | NULL    |                |
 
+## study_type
+| Field | Type        | Null | Key | Default | Extra          |
+|-------|-------------|------+-----|---------|----------------|
+| stid  | int         | NO   | PRI | NULL    | auto_increment |
+| pmid  | varchar(50) | NO   | MUL | NULL    |                |
+| type  | varchar(10) | YES  | MUL | NULL    |                |
+
