@@ -43,27 +43,39 @@ const customStyles = `
   }
 `;
 
+const formatScore = (value: unknown) => {
+  if (value === "" || value === null || value === undefined) {
+    return "";
+  }
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return "";
+  }
+  const fixed = numeric.toFixed(8);
+  return fixed.replace(/\.?0+$/, "");
+};
+
 const PublicationTableColumns = [
   {
     key: "PMID",
     name: "PMID",
-    width: 120,
+    width: 100,
     minWidth: 100,
-    maxWidth: 150,
+    maxWidth: 100,
     resizable: true,
     renderCell: ({ row, column }: { row: any; column: any }) => (
       <div className="break-words">
-        <a 
+        <a
           href={`https://pubmed.ncbi.nlm.nih.gov/${row[column.key]}`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-600 hover:text-blue-800 underline hover:no-underline transition-colors duration-200"
-          style={{ 
+          style={{
             cursor: 'pointer',
             display: 'inline-block',
             textDecoration: 'underline'
           }}
-          
+
         >
           {row[column.key]}
         </a>
@@ -73,9 +85,9 @@ const PublicationTableColumns = [
   {
     key: "Year",
     name: "YEAR",
-    width: 80,
+    width: 60,
     minWidth: 60,
-    maxWidth: 100,
+    maxWidth: 60,
     resizable: true,
     renderCell: ({ row, column }: { row: any; column: any }) => (
       <div className="text-center">
@@ -86,9 +98,9 @@ const PublicationTableColumns = [
   {
     key: "Title",
     name: "TITLE",
-    width: 400,
+    width: 320,
     minWidth: 200,
-    maxWidth: 500,
+    maxWidth: 420,
     resizable: true,
     renderCell: ({ row, column }: { row: any; column: any }) => (
       <div className="break-words">
@@ -99,9 +111,9 @@ const PublicationTableColumns = [
   {
     key: "StudyType",
     name: "STUDY TYPE",
-    width: 150,
-    minWidth: 120,
-    maxWidth: 200,
+    width: 100,
+    minWidth: 100,
+    maxWidth: 100,
     resizable: true,
     renderCell: ({ row, column }: { row: any; column: any }) => (
       <div className="break-words">
@@ -118,45 +130,6 @@ const PublicationTableColumns = [
     resizable: true,
     renderCell: ({ row, column }: { row: any; column: any }) => (
       <div className="break-words">
-        {row[column.key]}
-      </div>
-    ),
-  },
-  {
-    key: "PKScore",
-    name: "PK SCORE",
-    width: 110,
-    minWidth: 90,
-    maxWidth: 140,
-    resizable: true,
-    renderCell: ({ row, column }: { row: any; column: any }) => (
-      <div className="text-center">
-        {row[column.key]}
-      </div>
-    ),
-  },
-  {
-    key: "PEScore",
-    name: "PE SCORE",
-    width: 110,
-    minWidth: 90,
-    maxWidth: 140,
-    resizable: true,
-    renderCell: ({ row, column }: { row: any; column: any }) => (
-      <div className="text-center">
-        {row[column.key]}
-      </div>
-    ),
-  },
-  {
-    key: "CTScore",
-    name: "CT SCORE",
-    width: 110,
-    minWidth: 90,
-    maxWidth: 140,
-    resizable: true,
-    renderCell: ({ row, column }: { row: any; column: any }) => (
-      <div className="text-center">
         {row[column.key]}
       </div>
     ),
@@ -184,6 +157,45 @@ const PublicationTableColumns = [
     renderCell: ({ row, column }: { row: any; column: any }) => (
       <div className="break-words">
         {row[column.key]}
+      </div>
+    ),
+  },
+  {
+    key: "PKScore",
+    name: "PK SCORE",
+    width: 100,
+    minWidth: 70,
+    maxWidth: 120,
+    resizable: true,
+    renderCell: ({ row, column }: { row: any; column: any }) => (
+      <div className="text-center">
+        {formatScore(row[column.key])}
+      </div>
+    ),
+  },
+  {
+    key: "PEScore",
+    name: "PE SCORE",
+    width: 100,
+    minWidth: 70,
+    maxWidth: 120,
+    resizable: true,
+    renderCell: ({ row, column }: { row: any; column: any }) => (
+      <div className="text-center">
+        {formatScore(row[column.key])}
+      </div>
+    ),
+  },
+  {
+    key: "CTScore",
+    name: "CT SCORE",
+    width: 100,
+    minWidth: 70,
+    maxWidth: 120,
+    resizable: true,
+    renderCell: ({ row, column }: { row: any; column: any }) => (
+      <div className="text-center">
+        {formatScore(row[column.key])}
       </div>
     ),
   },
@@ -243,7 +255,9 @@ export default function PublicationTab({
     publicationCount !== null && publicationCount !== undefined
       ? publicationCount
       : fallbackCount;
-  const totalPages = Math.max(1, Math.ceil(displayCount / effectivePageSize));
+  const isSearchActive = searchTerm.trim().length > 0;
+  const effectiveCount = isSearchActive ? filteredData.length : displayCount;
+  const totalPages = Math.max(1, Math.ceil(effectiveCount / effectivePageSize));
   const startIndex = (effectivePage - 1) * effectivePageSize;
   const endIndex = startIndex + effectivePageSize;
   const sortedData = useMemo(() => {
@@ -287,9 +301,9 @@ export default function PublicationTab({
   }, [filteredData, sortColumns]);
 
   const paginatedData = isServerSide ? sortedData : sortedData.slice(startIndex, endIndex);
-  
+
   // Create placeholder data for loading state
-  const placeholderCount = Math.min(effectivePageSize, displayCount || effectivePageSize);
+  const placeholderCount = Math.min(effectivePageSize, effectiveCount || effectivePageSize);
   const placeholderData: PublicationTableRow[] = Array(placeholderCount).fill(null).map((_, i) => ({
     PMID: '',
     Year: '',
@@ -313,8 +327,8 @@ export default function PublicationTab({
 
   // Show loading state with placeholder if we have a count but no data yet
   const showPlaceholder = isLoading;
-  const totalEntries = publicationCount ?? fallbackCount;
-  const showCountingLabel = publicationCount === null || publicationCount === undefined;
+  const totalEntries = effectiveCount;
+  const showCountingLabel = !isSearchActive && (publicationCount === null || publicationCount === undefined);
   const showingEnd = isLoading
     ? Math.min(startIndex + effectivePageSize, totalEntries)
     : isServerSide
@@ -339,7 +353,7 @@ export default function PublicationTab({
       setLocalPage(1);
     }
   };
-  
+
   if (showEmptyState) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -354,7 +368,7 @@ export default function PublicationTab({
     <div className="space-y-6">
       {/* Custom Styles */}
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
-      
+
       {/* Search and Pagination Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center space-x-2">
@@ -373,7 +387,7 @@ export default function PublicationTab({
           </select>
           <label className="text-sm text-gray-600">entries</label>
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <label className="text-sm text-gray-600">Search:</label>
           <input
@@ -388,13 +402,13 @@ export default function PublicationTab({
 
       {/* DataGrid */}
       <div className="min-h-[600px]">
-        <DataGrid 
-          columns={PublicationTableColumns} 
+        <DataGrid
+          columns={PublicationTableColumns}
           rows={showPlaceholder ? placeholderData : paginatedData}
           sortColumns={sortColumns}
           onSortColumnsChange={setSortColumns}
           className="rdg-light"
-          style={{height: '100%'}}
+          style={{ height: '100%' }}
           defaultColumnOptions={{
             resizable: true,
             sortable: !showPlaceholder,
@@ -404,7 +418,7 @@ export default function PublicationTab({
       </div>
 
       {/* Pagination */}
-          {(totalPages > 1 || (isLoading && publicationCount !== null && publicationCount !== undefined && publicationCount > 0)) && (
+      {(totalPages > 1 || (isLoading && publicationCount !== null && publicationCount !== undefined && publicationCount > 0)) && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">
             {showCountingLabel
@@ -419,12 +433,12 @@ export default function PublicationTab({
             >
               Previous
             </button>
-            
+
             {/* Smart Page Numbers */}
             {(() => {
               const pages = [];
               const maxVisiblePages = 7; // Show max 7 page numbers
-              
+
               if (totalPages <= maxVisiblePages) {
                 // If total pages is small, show all pages
                 for (let i = 1; i <= totalPages; i++) {
@@ -433,11 +447,10 @@ export default function PublicationTab({
                       key={i}
                       onClick={() => handlePageChange(i)}
                       disabled={isLoading}
-                      className={`px-3 py-1 text-sm border rounded ${
-                        effectivePage === i
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`px-3 py-1 text-sm border rounded ${effectivePage === i
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {i}
                     </button>
@@ -447,23 +460,22 @@ export default function PublicationTab({
                 // Smart pagination with ellipsis
                 const leftBound = Math.max(1, effectivePage - 2);
                 const rightBound = Math.min(totalPages, effectivePage + 2);
-                
+
                 // Always show first page
                 pages.push(
                   <button
                     key={1}
                     onClick={() => handlePageChange(1)}
                     disabled={isLoading}
-                    className={`px-3 py-1 text-sm border rounded ${
-                      effectivePage === 1
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`px-3 py-1 text-sm border rounded ${effectivePage === 1
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     1
                   </button>
                 );
-                
+
                 // Add left ellipsis if needed
                 if (leftBound > 2) {
                   pages.push(
@@ -472,7 +484,7 @@ export default function PublicationTab({
                     </span>
                   );
                 }
-                
+
                 // Add middle pages around current page
                 for (let i = leftBound; i <= rightBound; i++) {
                   if (i > 1 && i < totalPages) {
@@ -481,18 +493,17 @@ export default function PublicationTab({
                         key={i}
                         onClick={() => handlePageChange(i)}
                         disabled={isLoading}
-                        className={`px-3 py-1 text-sm border rounded ${
-                          effectivePage === i
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`px-3 py-1 text-sm border rounded ${effectivePage === i
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {i}
                       </button>
                     );
                   }
                 }
-                
+
                 // Add right ellipsis if needed
                 if (rightBound < totalPages - 1) {
                   pages.push(
@@ -501,7 +512,7 @@ export default function PublicationTab({
                     </span>
                   );
                 }
-                
+
                 // Always show last page
                 if (totalPages > 1) {
                   pages.push(
@@ -509,21 +520,20 @@ export default function PublicationTab({
                       key={totalPages}
                       onClick={() => handlePageChange(totalPages)}
                       disabled={isLoading}
-                      className={`px-3 py-1 text-sm border rounded ${
-                        effectivePage === totalPages
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`px-3 py-1 text-sm border rounded ${effectivePage === totalPages
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {totalPages}
                     </button>
                   );
                 }
               }
-              
+
               return pages;
             })()}
-            
+
             <button
               onClick={() => handlePageChange(Math.min(totalPages, effectivePage + 1))}
               disabled={effectivePage === totalPages || isLoading}
