@@ -43,15 +43,11 @@ export const daGetTypePopulation = (pmids: PmidRow[], opts?: { signal?: AbortSig
 
 export type StudyRequestOptions = {
   signal?: AbortSignal;
-  limit?: number;
-  offset?: number;
 };
 
 export const daGetStudy = (pmids: PmidRow[], opts?: StudyRequestOptions) => {
-  const { signal, limit, offset } = opts ?? {};
-  const hasPagination = typeof limit === "number" || typeof offset === "number";
-  const body = hasPagination ? { pmids, limit, offset } : pmids;
-  return api.post<unknown>("/api/study", body, { signal });
+  const { signal } = opts ?? {};
+  return api.post<unknown>("/api/study", pmids, { signal });
 };
 
 export const daGetStudyCount = (pmids: PmidRow[], opts?: { signal?: AbortSignal }) =>

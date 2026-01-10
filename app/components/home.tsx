@@ -19,8 +19,6 @@ import {
   daGetOverallStudyType,
   daGetPMIDs,
   daGetStudy,
-  daGetStudyCount,
-  daGetTypePopulation,
   daGetDrugClassList,
   daGetDrugClassListByLevel,
   daExportStudy,
@@ -29,8 +27,7 @@ import {
   ConceptRow,
   PmidRow,
   SearchType,
-  StudyData,
-  TypeData
+  StudyData
 } from '../libs/database/types';
 import { calculateSummaryStats, preparePlotData, preparePopulationData } from '../libs/dataprocessor/utils';
 import { buildPublicationTable, PublicationTableRow } from './component-utils';
@@ -39,9 +36,7 @@ import { buildPublicationTable, PublicationTableRow } from './component-utils';
 
 const DEFAULT_LOGO_WIDTH = 150;
 const DEFAULT_LOGO_HEIGHT = 182;
-const DEFAULT_PUBLICATION_PAGE_SIZE = 25;
 const PUBLICATION_CACHE_LIMIT = 5;
-const PUBLICATION_PAGE_CACHE_LIMIT = 20;
 
 const logoSize = {
   w: 100,
@@ -174,21 +169,14 @@ export default function Home() {
   const [hasDrugSearched, setHasDrugSearched] = useState(false);
   const [isTabSwitching, setIsTabSwitching] = useState(false);
   const [pmidData, setPmidData] = useState<PmidRow[]>([]);
-  const [typeData, setTypeData] = useState<TypeData[]>([]);
   const [publicationData, setPublicationData] = useState<PublicationTableRow[]>([]);
   const [publicationCount, setPublicationCount] = useState<number | null>(null);
   const [isLoadingPublications, setIsLoadingPublications] = useState(false);
-  const [publicationPage, setPublicationPage] = useState(1);
-  const [publicationPageSize, setPublicationPageSize] = useState(DEFAULT_PUBLICATION_PAGE_SIZE);
   const [isLoadingPopulationData, setIsLoadingPopulationData] = useState(false);
   const [downloadType, setDownloadType] = useState<'xlsx' | 'csv' | 'tsv'>('xlsx');
   const [isExporting, setIsExporting] = useState(false);
 
-  const studyCacheRef = useRef(
-    new Map<string, { count: number | null; pages: Map<string, StudyData[]> }>()
-  );
-  const previousPmidKeyRef = useRef<string>('');
-
+  const studyCacheRef = useRef(new Map<string, StudyData[]>());
   const pmidKey = useMemo(() => {
     if (!pmidData || pmidData.length === 0) {
       return '';
@@ -274,7 +262,6 @@ export default function Home() {
       setQueryDrugClass('');
       setConcepts([]);
       setPmidData([]);
-      setTypeData([]);
       setPublicationData([]);
       handleTabChange("overview");
       handleConceptChange(selectedDrug, '');
@@ -351,49 +338,58 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!pmidData || pmidData.length === 0 || !typeData || typeData.length === 0) {
-      setPublicationData([]);
-      setPublicationCount(null);
-      setIsLoadingPublications(false);
-      return;
-    }
-
-    if (previousPmidKeyRef.current !== pmidKey) {
-      previousPmidKeyRef.current = pmidKey;
-      setPublicationData([]);
-      setPublicationCount(null);
-      setIsLoadingPublications(false);
-      if (publicationPage !== 1) {
-        setPublicationPage(1);
-        return;
-      }
-    }
-
     const controller = new AbortController();
     const { signal } = controller;
     let isActive = true;
 
-    const cache = studyCacheRef.current;
-    let entry = cache.get(pmidKey);
-    if (!entry) {
-      entry = { count: null, pages: new Map() };
-      cache.set(pmidKey, entry);
-      if (cache.size > PUBLICATION_CACHE_LIMIT) {
-        const oldestKey = cache.keys().next().value;
-        if (oldestKey) {
-          cache.delete(oldestKey);
-        }
-      }
+    if (!pmidData || pmidData.length === 0 || !pmidKey) {
+      setPublicationData([]);
+      setPublicationCount(0);
+      setIsLoadingPublications(false);
+      setIsLoadingPopulationData(false);
+      setPopulationData(DEFAULT_POPULATION_DATA);
+      return () => {
+        isActive = false;
+        controller.abort();
+      };
     }
 
-    setPublicationCount(typeData?.length ?? 0);
+    const cache = studyCacheRef.current;
+    const applyDerivedData = (studyData: StudyData[]) => {
+      const derivedTypeData = studyData.map(item => ({
+        pmid: item.PMID,
+        study_type: item.StudyType || "",
+        population: item.Population || "",
+        maternal_score_pk: item.maternal_score_pk ?? null,
+        maternal_score_pe: item.maternal_score_pe ?? null,
+        maternal_score_ct: item.maternal_score_ct ?? null,
+        pediatric_score_pk: item.pediatric_score_pk ?? null,
+        pediatric_score_pe: item.pediatric_score_pe ?? null,
+        pediatric_score_ct: item.pediatric_score_ct ?? null,
+      }));
 
-    const pageKey = `${publicationPage}-${publicationPageSize}`;
-    const cachedPage = entry.pages.get(pageKey);
-    if (cachedPage) {
-      const publicationData = buildPublicationTable(cachedPage, typeData);
-      setPublicationData(publicationData);
+      const summaryStats = calculateSummaryStats(derivedTypeData);
+      setOverallStudyType(prev => ({
+        ...prev,
+        pk: { ...prev.pk, count: summaryStats.find(stat => stat.study_type.toLowerCase() === "pk")?.count ?? 0 },
+        pe: { ...prev.pe, count: summaryStats.find(stat => stat.study_type.toLowerCase() === "pe")?.count ?? 0 },
+        ct: { ...prev.ct, count: summaryStats.find(stat => stat.study_type.toLowerCase() === "ct")?.count ?? 0 },
+      }));
+
+      const pkPlotData = preparePlotData("PK", derivedTypeData);
+      const pePlotData = preparePlotData("PE", derivedTypeData);
+      const ctPlotData = preparePlotData("CT", derivedTypeData);
+      const thePopulationData = preparePopulationData(pkPlotData, pePlotData, ctPlotData);
+      setPopulationData(thePopulationData);
+    };
+
+    const cached = cache.get(pmidKey);
+    if (cached) {
+      applyDerivedData(cached);
+      setPublicationData(buildPublicationTable(cached));
+      setPublicationCount(cached.length);
       setIsLoadingPublications(false);
+      setIsLoadingPopulationData(false);
       return () => {
         isActive = false;
         controller.abort();
@@ -403,54 +399,35 @@ export default function Home() {
     setIsLoadingPublications(true);
     setPublicationData([]);
 
-    const offset = (publicationPage - 1) * publicationPageSize;
-
-    if (entry.count === null) {
-      console.log("get study count", new Date().toISOString());
-      daGetStudyCount(pmidData, { signal })
-        .then((response: any) => {
-          if (!isActive) return;
-          console.log("get study count: ", response?.count ?? 0, new Date().toISOString());
-          const count = response?.count ?? 0;
-          if (entry) {
-            entry.count = count;
-          }
-        })
-        .catch((error: any) => {
-          if (!isActive || error?.name === "AbortError") return;
-          console.error("Error fetching study count:", error);
-        });
-    }
-
-    daGetStudy(pmidData, { signal, limit: publicationPageSize, offset })
+    daGetStudy(pmidData, { signal })
       .then((data: any) => {
         if (!isActive) return;
-        console.log("got study data", new Date().toISOString());
         const studyData = data as StudyData[];
-        entry?.pages.set(pageKey, studyData);
-        if (entry && entry.pages.size > PUBLICATION_PAGE_CACHE_LIMIT) {
-          const oldestPageKey = entry.pages.keys().next().value;
-          if (oldestPageKey) {
-            entry.pages.delete(oldestPageKey);
+        cache.set(pmidKey, studyData);
+        if (cache.size > PUBLICATION_CACHE_LIMIT) {
+          const oldestKey = cache.keys().next().value;
+          if (oldestKey) {
+            cache.delete(oldestKey);
           }
         }
-        const publicationData = buildPublicationTable(studyData, typeData);
-        setPublicationData(publicationData);
-        console.log("[ln446] set publication count", typeData?.length ?? 0);
-        setPublicationCount(typeData?.length ?? 0);
+        applyDerivedData(studyData);
+        setPublicationData(buildPublicationTable(studyData));
+        setPublicationCount(studyData.length);
         setIsLoadingPublications(false);
+        setIsLoadingPopulationData(false);
       })
       .catch((error: any) => {
         if (!isActive || error?.name === "AbortError") return;
         console.error("Error fetching study data:", error);
         setIsLoadingPublications(false);
+        setIsLoadingPopulationData(false);
       });
 
     return () => {
       isActive = false;
       controller.abort();
     };
-  }, [pmidData, typeData, pmidKey, publicationPage, publicationPageSize]);
+  }, [pmidData, pmidKey]);
 
   // Handle window resize for responsive charts
   useEffect(() => {
@@ -516,28 +493,6 @@ export default function Home() {
       }
       daGetPMIDs(data, searchType).then((pmidData: any) => {
         setPmidData(pmidData);
-        daGetTypePopulation(pmidData).then((data: any) => {
-          const typeData = data as TypeData[];
-          setTypeData(typeData);
-          const summaryStats = calculateSummaryStats(typeData);
-          const newOverallStudyType = { ...overallStudyType };
-          newOverallStudyType.pk.count = summaryStats.find(stat => stat.study_type.toLowerCase() === "pk")?.count ?? 0;
-          newOverallStudyType.pe.count = summaryStats.find(stat => stat.study_type.toLowerCase() === "pe")?.count ?? 0;
-          newOverallStudyType.ct.count = summaryStats.find(stat => stat.study_type.toLowerCase() === "ct")?.count ?? 0;
-          setOverallStudyType(newOverallStudyType);
-
-          const pkPlotData = preparePlotData("PK", typeData);
-          const pePlotData = preparePlotData("PE", typeData);
-          const ctPlotData = preparePlotData("CT", typeData);
-
-          const thePopulationData = preparePopulationData(pkPlotData, pePlotData, ctPlotData);
-
-          setPopulationData(thePopulationData);
-          setIsLoadingPopulationData(false);
-        }).catch((error: any) => {
-          console.error('Error fetching type population data:', error);
-          setIsLoadingPopulationData(false);
-        });
       }).catch((error: any) => {
         console.error('Error fetching PMIDs:', error);
         setIsLoadingPopulationData(false);
@@ -559,7 +514,6 @@ export default function Home() {
     setQueryDisease(selectedDisease ?? "");
     setConcepts([]);
     setPmidData([]);
-    setTypeData([]);
     setPublicationData([]);
     handleTabChange("overview");
     handleConceptChange(selectedDrug, selectedDisease);
@@ -591,7 +545,6 @@ export default function Home() {
     }
     setConcepts([]);
     setPmidData([]);
-    setTypeData([]);
     setPublicationData([]);
     setHasDrugSearched(false);
     setActiveTab('overview');
@@ -838,11 +791,6 @@ export default function Home() {
                     publicationCount={publicationCount}
                     estimatedCount={pmidData.length}
                     isLoading={isLoadingPublications}
-                    currentPage={publicationPage}
-                    pageSize={publicationPageSize}
-                    onPageChange={setPublicationPage}
-                    onPageSizeChange={setPublicationPageSize}
-                    serverSide
                   />
                 )}
               </Tabs.Content>

@@ -351,9 +351,16 @@ export async function queriedStudy(pmidList: string[]): Promise<StudyResult[]> {
         c.PMID AS PMID,
         c.Title AS Title,
         c.Year AS Year,
+        c.StudyType AS StudyType,
         c.Population AS \`Population\`,
         c.StudiedDrugs AS \`StudiedDrugs\`,
-        c.StudiedDiseases AS \`StudiedDiseases\`
+        c.StudiedDiseases AS \`StudiedDiseases\`,
+        c.maternal_Score_PK AS maternal_score_pk,
+        c.maternal_Score_PE AS maternal_score_pe,
+        c.maternal_Score_CT AS maternal_score_ct,
+        c.pediatric_Score_PK AS pediatric_score_pk,
+        c.pediatric_Score_PE AS pediatric_score_pe,
+        c.pediatric_Score_CT AS pediatric_score_ct
       FROM cache_full_study c
       WHERE c.PMID IN (${placeholders(batch.length)})
     `;
@@ -375,7 +382,6 @@ export async function queriedStudy(pmidList: string[]): Promise<StudyResult[]> {
 
   return results;
 }
-
 
 
 

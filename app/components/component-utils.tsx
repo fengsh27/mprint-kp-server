@@ -296,18 +296,19 @@ export interface PublicationTableRow {
   PEScore: string;
   CTScore: string;
 }
-export const buildPublicationTable = (data: StudyData[], typeData: TypeData[]): PublicationTableRow[] => {
+export const buildPublicationTable = (data: StudyData[], typeData: TypeData[] = []): PublicationTableRow[] => {
   const typeMap = new Map<string, TypeData>(typeData.map(item => [item.pmid, item]));
 
   return data.map(item => {
     const type = typeMap.get(item.PMID);
     const population = type?.population || item.Population || "";
-    const pkScore = type?.maternal_score_pk ?? type?.pediatric_score_pk;
-    const peScore = type?.maternal_score_pe ?? type?.pediatric_score_pe;
-    const ctScore = type?.maternal_score_ct ?? type?.pediatric_score_ct;
+    const studyType = type?.study_type || item.StudyType || "";
+    const pkScore = type?.maternal_score_pk ?? type?.pediatric_score_pk ?? item.maternal_score_pk ?? item.pediatric_score_pk;
+    const peScore = type?.maternal_score_pe ?? type?.pediatric_score_pe ?? item.maternal_score_pe ?? item.pediatric_score_pe;
+    const ctScore = type?.maternal_score_ct ?? type?.pediatric_score_ct ?? item.maternal_score_ct ?? item.pediatric_score_ct;
     return {
       ...item,
-      StudyType: type?.study_type || "",
+      StudyType: studyType,
       Population: population,
       PKScore: pkScore !== undefined && pkScore !== null ? String(pkScore) : "",
       PEScore: peScore !== undefined && peScore !== null ? String(peScore) : "",

@@ -27,8 +27,8 @@ function hashPmids(pmids: string[]): string {
   return `${hash >>> 0}-${pmids.length}`;
 }
 
-function getCacheKey(pmids: string[], limit?: number, offset?: number): string {
-  return `${hashPmids(pmids)}:${limit ?? "all"}:${offset ?? 0}`;
+function getCacheKey(pmids: string[]): string {
+  return hashPmids(pmids);
 }
 
 function getCachedStudy(key: string) {
@@ -67,44 +67,15 @@ async function studyHandler(req: Request) {
   try {
     const body = await req.json();
     let items: any[] | null = null;
-    let limit: number | undefined;
-    let offset: number | undefined;
-
     // Input validation
     if (Array.isArray(body)) {
       items = body;
     } else if (body && Array.isArray(body.pmids)) {
       items = body.pmids;
-      if (body.limit !== undefined) limit = Number(body.limit);
-      if (body.offset !== undefined) offset = Number(body.offset);
     } else {
       logSecurityEvent(req as any, 'INVALID_INPUT', { error: 'Request body must be an array or an object with pmids' });
       return NextResponse.json(
         { error: 'Invalid input', message: 'Request body must be an array or an object with pmids' },
-        { status: 400 }
-      );
-    }
-
-    if (offset !== undefined && limit === undefined) {
-      logSecurityEvent(req as any, 'INVALID_INPUT', { error: 'Offset requires a limit' });
-      return NextResponse.json(
-        { error: 'Invalid input', message: 'Offset requires a limit' },
-        { status: 400 }
-      );
-    }
-
-    if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
-      logSecurityEvent(req as any, 'INVALID_INPUT', { error: 'Invalid limit value' });
-      return NextResponse.json(
-        { error: 'Invalid input', message: 'Limit must be a positive integer' },
-        { status: 400 }
-      );
-    }
-
-    if (offset !== undefined && (!Number.isInteger(offset) || offset < 0)) {
-      logSecurityEvent(req as any, 'INVALID_INPUT', { error: 'Invalid offset value' });
-      return NextResponse.json(
-        { error: 'Invalid input', message: 'Offset must be a non-negative integer' },
         { status: 400 }
       );
     }
@@ -168,13 +139,9 @@ async function studyHandler(req: Request) {
     const pmids = items.map((item: any) => item.pmid);
     const sanitizedPmids = sanitizeInput(pmids);
 
-    const normalizedOffset = offset ?? 0;
-    const pagedPmids =
-      limit !== undefined ? sanitizedPmids.slice(normalizedOffset, normalizedOffset + limit) : sanitizedPmids;
-
-    const cacheKey = getCacheKey(sanitizedPmids, limit, normalizedOffset);
+    const cacheKey = getCacheKey(sanitizedPmids);
     const cachedRows = getCachedStudy(cacheKey);
-    const rows = cachedRows ?? (await queriedStudy(pagedPmids));
+    const rows = cachedRows ?? (await queriedStudy(sanitizedPmids));
     if (!cachedRows) {
       setCachedStudy(cacheKey, rows);
     }
@@ -185,7 +152,6 @@ async function studyHandler(req: Request) {
     // Log successful query
     logSecurityEvent(req as any, 'SUCCESSFUL_QUERY', {
       pmidCount: pmids.length,
-      pageSize: pagedPmids.length,
       resultCount: rows.length,
       requestDurationMs: Math.round(requestDurationMs * 100) / 100
     });
