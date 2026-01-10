@@ -292,16 +292,26 @@ export interface PublicationTableRow {
   StudiedDiseases: string;
   StudyType: string;
   Population: string;
+  PKScore: string;
+  PEScore: string;
+  CTScore: string;
 }
 export const buildPublicationTable = (data: StudyData[], typeData: TypeData[]): PublicationTableRow[] => {
   const typeMap = new Map<string, TypeData>(typeData.map(item => [item.pmid, item]));
 
   return data.map(item => {
     const type = typeMap.get(item.PMID);
+    const population = type?.population || item.Population || "";
+    const pkScore = type?.maternal_score_pk ?? type?.pediatric_score_pk;
+    const peScore = type?.maternal_score_pe ?? type?.pediatric_score_pe;
+    const ctScore = type?.maternal_score_ct ?? type?.pediatric_score_ct;
     return {
       ...item,
       StudyType: type?.study_type || "",
-      Population: type?.population || "",
+      Population: population,
+      PKScore: pkScore !== undefined && pkScore !== null ? String(pkScore) : "",
+      PEScore: peScore !== undefined && peScore !== null ? String(peScore) : "",
+      CTScore: ctScore !== undefined && ctScore !== null ? String(ctScore) : "",
     }
   }).filter(item => item.StudyType !== "")
 }
@@ -373,6 +383,9 @@ const columns: Array<DownloadTableColumn> = [
   { label: 'Studied Diseases', value: (item: PublicationTableRow) => item.StudiedDiseases },
   { label: 'study_type', value: (item: PublicationTableRow) => item.StudyType },
   { label: 'population', value: (item: PublicationTableRow) => item.Population },
+  { label: 'PK Score', value: (item: PublicationTableRow) => item.PKScore },
+  { label: 'PE Score', value: (item: PublicationTableRow) => item.PEScore },
+  { label: 'CT Score', value: (item: PublicationTableRow) => item.CTScore },
 ]
 export function downloadPublicationTableAsCsv(publicationData: PublicationTableRow[]) {
   const timestamp = generateTimestamp();
@@ -425,6 +438,18 @@ const publicationSchema = [{
   column: "population",
   type: String,
   value: (item: PublicationTableRow) => item.Population,
+}, {
+  column: "PK Score",
+  type: String,
+  value: (item: PublicationTableRow) => item.PKScore,
+}, {
+  column: "PE Score",
+  type: String,
+  value: (item: PublicationTableRow) => item.PEScore,
+}, {
+  column: "CT Score",
+  type: String,
+  value: (item: PublicationTableRow) => item.CTScore,
 }];
 
 export const downloadPublicationTableAsXlsx = (publicationData: PublicationTableRow[]) => {

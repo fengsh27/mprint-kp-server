@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import 'react-data-grid/lib/styles.css';
-import { DataGrid } from 'react-data-grid';
+import { DataGrid, type SortColumn } from 'react-data-grid';
 // import { daGetStudy } from '../dataprovider/dataaccessor';
 // import { PmidRow, StudyData, TypeData } from '../libs/database/types';
 import { PublicationTableRow } from './component-utils';
@@ -123,6 +123,45 @@ const PublicationTableColumns = [
     ),
   },
   {
+    key: "PKScore",
+    name: "PK SCORE",
+    width: 110,
+    minWidth: 90,
+    maxWidth: 140,
+    resizable: true,
+    renderCell: ({ row, column }: { row: any; column: any }) => (
+      <div className="text-center">
+        {row[column.key]}
+      </div>
+    ),
+  },
+  {
+    key: "PEScore",
+    name: "PE SCORE",
+    width: 110,
+    minWidth: 90,
+    maxWidth: 140,
+    resizable: true,
+    renderCell: ({ row, column }: { row: any; column: any }) => (
+      <div className="text-center">
+        {row[column.key]}
+      </div>
+    ),
+  },
+  {
+    key: "CTScore",
+    name: "CT SCORE",
+    width: 110,
+    minWidth: 90,
+    maxWidth: 140,
+    resizable: true,
+    renderCell: ({ row, column }: { row: any; column: any }) => (
+      <div className="text-center">
+        {row[column.key]}
+      </div>
+    ),
+  },
+  {
     key: "StudiedDrugs",
     name: "STUDIED DRUGS",
     width: 250,
@@ -176,6 +215,7 @@ export default function PublicationTab({
   const [searchTerm, setSearchTerm] = useState('');
   const [showEntries, setShowEntries] = useState(10);
   const [localPage, setLocalPage] = useState(1);
+  const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   // const [publicationData, setPublicationData] = useState<PublicationTableRow[]>([]);
 
   const isServerSide =
@@ -206,7 +246,47 @@ export default function PublicationTab({
   const totalPages = Math.max(1, Math.ceil(displayCount / effectivePageSize));
   const startIndex = (effectivePage - 1) * effectivePageSize;
   const endIndex = startIndex + effectivePageSize;
-  const paginatedData = isServerSide ? filteredData : filteredData.slice(startIndex, endIndex);
+  const sortedData = useMemo(() => {
+    if (sortColumns.length === 0) {
+      return filteredData;
+    }
+
+    const numericKeys = new Set(["PKScore", "PEScore", "CTScore"]);
+    return [...filteredData].sort((a, b) => {
+      for (const sort of sortColumns) {
+        const direction = sort.direction === "DESC" ? -1 : 1;
+        const key = sort.columnKey as keyof PublicationTableRow;
+        const rawA = a[key];
+        const rawB = b[key];
+
+        let compare = 0;
+        if (numericKeys.has(String(key))) {
+          const numA = rawA !== null && rawA !== undefined && rawA !== "" ? Number(rawA) : null;
+          const numB = rawB !== null && rawB !== undefined && rawB !== "" ? Number(rawB) : null;
+          if (numA === null && numB === null) {
+            compare = 0;
+          } else if (numA === null) {
+            compare = 1;
+          } else if (numB === null) {
+            compare = -1;
+          } else {
+            compare = numA === numB ? 0 : numA > numB ? 1 : -1;
+          }
+        } else {
+          const textA = rawA?.toString() ?? "";
+          const textB = rawB?.toString() ?? "";
+          compare = textA.localeCompare(textB);
+        }
+
+        if (compare !== 0) {
+          return compare * direction;
+        }
+      }
+      return 0;
+    });
+  }, [filteredData, sortColumns]);
+
+  const paginatedData = isServerSide ? sortedData : sortedData.slice(startIndex, endIndex);
   
   // Create placeholder data for loading state
   const placeholderCount = Math.min(effectivePageSize, displayCount || effectivePageSize);
@@ -216,6 +296,9 @@ export default function PublicationTab({
     Title: 'Loading...',
     StudyType: '',
     Population: '',
+    PKScore: '',
+    PEScore: '',
+    CTScore: '',
     StudiedDrugs: '',
     StudiedDiseases: '',
   }));
@@ -307,7 +390,9 @@ export default function PublicationTab({
       <div className="min-h-[600px]">
         <DataGrid 
           columns={PublicationTableColumns} 
-          rows={showPlaceholder ? placeholderData : paginatedData} 
+          rows={showPlaceholder ? placeholderData : paginatedData}
+          sortColumns={sortColumns}
+          onSortColumnsChange={setSortColumns}
           className="rdg-light"
           style={{height: '100%'}}
           defaultColumnOptions={{

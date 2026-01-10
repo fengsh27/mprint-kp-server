@@ -27,6 +27,7 @@ export type StudyResult = {
   PMID: string;
   Title: string;
   Year: string;
+  Population: string;
   StudiedDrugs: string;
   StudiedDiseases: string;
 };
@@ -81,6 +82,7 @@ export type StudyData = {
   PMID: string;
   Title: string;
   Year: string;
+  Population: string;
   StudiedDrugs: string;
   StudiedDiseases: string;
 }
@@ -89,5 +91,10 @@ export type TypeData = {
   pmid: string;
   study_type: string;
   population: string;
+  maternal_score_pk: number | null;
+  maternal_score_pe: number | null;
+  maternal_score_ct: number | null;
+  pediatric_score_pk: number | null;
+  pediatric_score_pe: number | null;
+  pediatric_score_ct: number | null;
 }
-
