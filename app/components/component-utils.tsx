@@ -18,7 +18,7 @@ export interface RCTreeNode {
 }
 
 export const build_atc_tree = (atcData: ATCData[]) => {
-  const build_node = (values: string[], level: number = 0): RCTreeNode => {    
+  const build_node = (values: string[], level: number = 0): RCTreeNode => {
     if (values.length === 1) {
       return {
         key: values[0],
@@ -74,25 +74,25 @@ export const build_atc_tree = (atcData: ATCData[]) => {
 export const getAtcCustomIcon = (props: any) => {
   const { expanded, data } = props;
   const level = data.level || 0;
-  
+
   // Different icons based on level and whether it's expanded
   if (level === 0) {
     // Root level - Database icon
     return <Database className="w-4 h-4 text-blue-600" />;
   } else if (level === 1) {
     // L1 level - Large folder
-    return expanded ? 
-      <FolderOpen className="w-4 h-4 text-green-600" /> : 
+    return expanded ?
+      <FolderOpen className="w-4 h-4 text-green-600" /> :
       <Folder className="w-4 h-4 text-green-600" />;
   } else if (level === 2) {
     // L2 level - Medium folder
-    return expanded ? 
-      <FolderOpen className="w-4 h-4 text-orange-600" /> : 
+    return expanded ?
+      <FolderOpen className="w-4 h-4 text-orange-600" /> :
       <Folder className="w-4 h-4 text-orange-600" />;
   } else if (level === 3) {
     // L3 level - Small folder
-    return expanded ? 
-      <FolderOpen className="w-4 h-4 text-purple-600" /> : 
+    return expanded ?
+      <FolderOpen className="w-4 h-4 text-purple-600" /> :
       <Folder className="w-4 h-4 text-purple-600" />;
   } else if (level === 4) {
     // L4 level - File icon
@@ -123,7 +123,7 @@ export const LabelStatsTableColumns = [{
   maxWidth: 150,
   resizable: true,
   headerRenderer: ({ column }: { column: any }) => (
-    <div 
+    <div
       title={column.name}
       className="truncate font-medium text-center"
       style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
@@ -292,18 +292,29 @@ export interface PublicationTableRow {
   StudiedDiseases: string;
   StudyType: string;
   Population: string;
+  PKScore: string;
+  PEScore: string;
+  CTScore: string;
 }
-export const buildPublicationTable = (data: StudyData[], typeData: TypeData[]): PublicationTableRow[] => {
+export const buildPublicationTable = (data: StudyData[], typeData: TypeData[] = []): PublicationTableRow[] => {
   const typeMap = new Map<string, TypeData>(typeData.map(item => [item.pmid, item]));
 
   return data.map(item => {
     const type = typeMap.get(item.PMID);
+    const population = type?.population || item.Population || "";
+    const studyType = type?.study_type || item.StudyType || "";
+    const pkScore = type?.maternal_score_pk ?? type?.pediatric_score_pk ?? item.maternal_score_pk ?? item.pediatric_score_pk;
+    const peScore = type?.maternal_score_pe ?? type?.pediatric_score_pe ?? item.maternal_score_pe ?? item.pediatric_score_pe;
+    const ctScore = type?.maternal_score_ct ?? type?.pediatric_score_ct ?? item.maternal_score_ct ?? item.pediatric_score_ct;
     return {
       ...item,
-      StudyType: type?.study_type || "",
-      Population: type?.population || "",
+      StudyType: studyType,
+      Population: population,
+      PKScore: pkScore !== undefined && pkScore !== null ? String(pkScore) : "",
+      PEScore: peScore !== undefined && peScore !== null ? String(peScore) : "",
+      CTScore: ctScore !== undefined && ctScore !== null ? String(ctScore) : "",
     }
-  })
+  }).filter(item => item.StudyType !== "")
 }
 
 
@@ -327,7 +338,7 @@ const generateTimestamp = (): string => {
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const seconds = String(now.getSeconds()).padStart(2, '0');
-  
+
   return `${year}${month}${day}_${hours}${minutes}${seconds}`;
 };
 
@@ -373,8 +384,11 @@ const columns: Array<DownloadTableColumn> = [
   { label: 'Studied Diseases', value: (item: PublicationTableRow) => item.StudiedDiseases },
   { label: 'study_type', value: (item: PublicationTableRow) => item.StudyType },
   { label: 'population', value: (item: PublicationTableRow) => item.Population },
+  { label: 'PK Score', value: (item: PublicationTableRow) => item.PKScore },
+  { label: 'PE Score', value: (item: PublicationTableRow) => item.PEScore },
+  { label: 'CT Score', value: (item: PublicationTableRow) => item.CTScore },
 ]
-export function downloadPublicationTableAsCsv(publicationData: PublicationTableRow[]) { 
+export function downloadPublicationTableAsCsv(publicationData: PublicationTableRow[]) {
   const timestamp = generateTimestamp();
   downloadDelimitedFile(
     publicationData,
@@ -425,6 +439,18 @@ const publicationSchema = [{
   column: "population",
   type: String,
   value: (item: PublicationTableRow) => item.Population,
+}, {
+  column: "PK Score",
+  type: String,
+  value: (item: PublicationTableRow) => item.PKScore,
+}, {
+  column: "PE Score",
+  type: String,
+  value: (item: PublicationTableRow) => item.PEScore,
+}, {
+  column: "CT Score",
+  type: String,
+  value: (item: PublicationTableRow) => item.CTScore,
 }];
 
 export const downloadPublicationTableAsXlsx = (publicationData: PublicationTableRow[]) => {

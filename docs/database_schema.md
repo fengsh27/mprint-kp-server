@@ -53,10 +53,19 @@
 | MOA   | varchar(1024) | YES  |     | NULL    |                |
 | type  | varchar(50)   | YES  |     | NULL    |                |
 
-## study_type
+## new_study_type
 | Field | Type        | Null | Key | Default | Extra          |
 |-------|-------------|------+-----|---------|----------------|
 | stid  | int         | NO   | PRI | NULL    | auto_increment |
 | pmid  | varchar(50) | NO   | MUL | NULL    |                |
 | type  | varchar(10) | YES  | MUL | NULL    |                |
+
+## new_population
+| Field | Type        | Null | Key | Default | Extra          |
+|-------|-------------|------|-----|---------|----------------|
+| poid  | int         | NO   | PRI | NULL    | auto_increment |
+| pmid  | varchar(50) | YES  | MUL | NULL    |                |
+| type  | varchar(25) | YES  | MUL | NULL    |                |
+| cate  | varchar(25) | YES  |     | NULL    |                |
+
 

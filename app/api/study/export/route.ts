@@ -1,7 +1,7 @@
 // app/api/study/export/route.ts
 import { NextResponse } from "next/server";
 import writeXlsxFile from "write-excel-file/node";
-import { queriedStudy, queriedType } from "../../../libs/database/query_db";
+import { queriedStudy } from "../../../libs/database/query_db";
 import { withRateLimit, searchRateLimiter } from "../../../libs/middleware/rateLimiter";
 import {
   InputValidator,
@@ -23,6 +23,9 @@ type PublicationExportRow = {
   StudiedDiseases: string;
   StudyType: string;
   Population: string;
+  PKScore: string;
+  PEScore: string;
+  CTScore: string;
 };
 
 const exportColumns = [
@@ -32,7 +35,10 @@ const exportColumns = [
   { label: "Studied Drugs", value: (item: PublicationExportRow) => item.StudiedDrugs },
   { label: "Studied Diseases", value: (item: PublicationExportRow) => item.StudiedDiseases },
   { label: "study_type", value: (item: PublicationExportRow) => item.StudyType },
-  { label: "population", value: (item: PublicationExportRow) => item.Population }
+  { label: "population", value: (item: PublicationExportRow) => item.Population },
+  { label: "PK Score", value: (item: PublicationExportRow) => item.PKScore },
+  { label: "PE Score", value: (item: PublicationExportRow) => item.PEScore },
+  { label: "CT Score", value: (item: PublicationExportRow) => item.CTScore }
 ];
 
 const exportSchema = [
@@ -42,7 +48,10 @@ const exportSchema = [
   { column: "Studied Drugs", type: String, value: (item: PublicationExportRow) => item.StudiedDrugs },
   { column: "Studied Diseases", type: String, value: (item: PublicationExportRow) => item.StudiedDiseases },
   { column: "study_type", type: String, value: (item: PublicationExportRow) => item.StudyType },
-  { column: "population", type: String, value: (item: PublicationExportRow) => item.Population }
+  { column: "population", type: String, value: (item: PublicationExportRow) => item.Population },
+  { column: "PK Score", type: String, value: (item: PublicationExportRow) => item.PKScore },
+  { column: "PE Score", type: String, value: (item: PublicationExportRow) => item.PEScore },
+  { column: "CT Score", type: String, value: (item: PublicationExportRow) => item.CTScore }
 ];
 
 const sanitizeCell = (cell: string) => {
@@ -154,22 +163,22 @@ async function studyExportHandler(req: Request) {
     const pmids = items.map((item: any) => item.pmid);
     const sanitizedPmids = sanitizeInput(pmids);
 
-    const [studyRows, typeRows] = await Promise.all([
-      queriedStudy(sanitizedPmids),
-      queriedType(sanitizedPmids)
-    ]);
-
-    const typeMap = new Map(typeRows.map((item) => [item.pmid, item]));
+    const studyRows = await queriedStudy(sanitizedPmids);
     const exportRows: PublicationExportRow[] = studyRows.map((row) => {
-      const type = typeMap.get(row.PMID);
+      const pkScore = row.maternal_score_pk ?? row.pediatric_score_pk;
+      const peScore = row.maternal_score_pe ?? row.pediatric_score_pe;
+      const ctScore = row.maternal_score_ct ?? row.pediatric_score_ct;
       return {
         PMID: row.PMID,
         Title: row.Title ?? "",
         Year: row.Year ?? "",
         StudiedDrugs: row.StudiedDrugs ?? "",
         StudiedDiseases: row.StudiedDiseases ?? "",
-        StudyType: type?.study_type ?? "",
-        Population: type?.population ?? ""
+        StudyType: row.StudyType ?? "",
+        Population: row.Population ?? "",
+        PKScore: pkScore !== undefined && pkScore !== null ? String(pkScore) : "",
+        PEScore: peScore !== undefined && peScore !== null ? String(peScore) : "",
+        CTScore: ctScore !== undefined && ctScore !== null ? String(ctScore) : ""
       };
     });
 

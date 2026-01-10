@@ -1,12 +1,12 @@
 import { Pool } from "mysql2/promise";
 
 import pool from "./silverdb";
-import { 
-  RowDict, 
-  ConceptRow, 
-  QueryInputs, 
-  QueriedPmidInput, 
-  PmidRow, 
+import {
+  RowDict,
+  ConceptRow,
+  QueryInputs,
+  QueriedPmidInput,
+  PmidRow,
   SearchType,
   StudyResult,
 } from "./types";
@@ -106,13 +106,13 @@ export async function queryConceptsMySql(
       if (diseaseName === undefined && drugName === undefined) {
         return [];
       }
-      if (diseaseName === undefined) {    
+      if (diseaseName === undefined) {
         const concepts = await fetchConceptsByName(pool, drugName);
         if (concepts.length > 0 && concepts.every(c => c.type === "disease")) {
           const children = await fetchDiseaseChildren(pool, concepts.map(c => c.cui));
           return dedup_rows([...concepts, ...children], (c: ConceptRow) => `${c.type}:${c.cui}`);
         }
-        return dedup_rows(concepts, (c: ConceptRow) => `${c.type}:${c.cui}`);    
+        return dedup_rows(concepts, (c: ConceptRow) => `${c.type}:${c.cui}`);
       }
       if (drugName === undefined) {
         const concepts = await fetchConceptsByName(pool, diseaseName);
@@ -263,15 +263,34 @@ export const queriedType = async (pmids: string[]) => {
       const sql = `
         SELECT st.pmid,
             GROUP_CONCAT(DISTINCT st.type SEPARATOR ' / ') AS study_type,
-            GROUP_CONCAT(DISTINCT pop.type SEPARATOR ' / ') AS population
+            GROUP_CONCAT(DISTINCT pop.type SEPARATOR ' / ') AS population,
+            MAX(m.Score_PK) AS maternal_score_pk,
+            MAX(m.Score_PE) AS maternal_score_pe,
+            MAX(m.Score_CT) AS maternal_score_ct,
+            MAX(p.Score_PK) AS pediatric_score_pk,
+            MAX(p.Score_PE) AS pediatric_score_pe,
+            MAX(p.Score_CT) AS pediatric_score_ct
         FROM new_study_type st
         LEFT JOIN new_population pop ON st.pmid = pop.pmid
+        LEFT JOIN maternal_database_with_scores m ON st.pmid = m.PMID
+        LEFT JOIN pediatric_database_with_scores p ON st.pmid = p.PMID
         WHERE st.pmid IN (${placeholders(pmidList.length)})
+        AND st.type in ('PK', 'PE', 'CT')
         GROUP BY st.pmid
       `;
-      
+
       const [rows] = await pool.execute(sql, pmidList);
-      return rows as { pmid: string; study_type: string; population: string }[];
+      return rows as {
+        pmid: string;
+        study_type: string;
+        population: string;
+        maternal_score_pk: number | null;
+        maternal_score_pe: number | null;
+        maternal_score_ct: number | null;
+        pediatric_score_pk: number | null;
+        pediatric_score_pe: number | null;
+        pediatric_score_ct: number | null;
+      }[];
     },
     { pmidCount: pmids.length }
   );
@@ -329,18 +348,21 @@ export async function queriedStudy(pmidList: string[]): Promise<StudyResult[]> {
 
     const sql = `
       SELECT
-        p.pmid AS PMID,
-        MAX(p.title) AS Title,
-        p.pubdate AS Year,
-        GROUP_CONCAT(DISTINCT pd.text SEPARATOR ' / ') AS \`StudiedDrugs\`,
-        GROUP_CONCAT(DISTINCT CASE 
-          WHEN pd2.text != 'NA' AND pd2.text IS NOT NULL THEN pd2.text 
-        END SEPARATOR ' / ') AS \`StudiedDiseases\`
-      FROM new_pubmed_records p
-      LEFT JOIN new_pmid2drug pd ON p.pmid = pd.pmid
-      LEFT JOIN new_pmid2disease pd2 ON p.pmid = pd2.pmid
-      WHERE p.pmid IN (${placeholders(batch.length)})
-      GROUP BY p.pmid
+        c.PMID AS PMID,
+        c.Title AS Title,
+        c.Year AS Year,
+        c.StudyType AS StudyType,
+        c.Population AS \`Population\`,
+        c.StudiedDrugs AS \`StudiedDrugs\`,
+        c.StudiedDiseases AS \`StudiedDiseases\`,
+        c.maternal_Score_PK AS maternal_score_pk,
+        c.maternal_Score_PE AS maternal_score_pe,
+        c.maternal_Score_CT AS maternal_score_ct,
+        c.pediatric_Score_PK AS pediatric_score_pk,
+        c.pediatric_Score_PE AS pediatric_score_pe,
+        c.pediatric_Score_CT AS pediatric_score_ct
+      FROM cache_full_study c
+      WHERE c.PMID IN (${placeholders(batch.length)})
     `;
 
     const batchResults = await timeBatchedQuery(
@@ -360,10 +382,6 @@ export async function queriedStudy(pmidList: string[]): Promise<StudyResult[]> {
 
   return results;
 }
-
-
-
-
 
 
 
