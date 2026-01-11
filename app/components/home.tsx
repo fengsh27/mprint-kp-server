@@ -217,6 +217,14 @@ export default function Home() {
       ticktext: []
     }
   });
+  const hasActiveQuery = Boolean(
+    queryDrug?.trim() ||
+    queryDisease?.trim() ||
+    queryDrugClass?.trim() ||
+    selectedDrug?.trim() ||
+    selectedDisease?.trim() ||
+    selectedDrugClass?.trim()
+  );
 
   // initialize overview data
   // 1. populate overall study type
@@ -347,7 +355,17 @@ export default function Home() {
       setPublicationCount(0);
       setIsLoadingPublications(false);
       setIsLoadingPopulationData(false);
-      setPopulationData(DEFAULT_POPULATION_DATA);
+      if (hasActiveQuery) {
+        setOverallStudyType(prev => ({
+          ...prev,
+          pk: { ...prev.pk, count: 0 },
+          pe: { ...prev.pe, count: 0 },
+          ct: { ...prev.ct, count: 0 },
+        }));
+        setPopulationData([]);
+      } else {
+        setPopulationData(DEFAULT_POPULATION_DATA);
+      }
       return () => {
         isActive = false;
         controller.abort();
@@ -427,7 +445,7 @@ export default function Home() {
       isActive = false;
       controller.abort();
     };
-  }, [pmidData, pmidKey]);
+  }, [pmidData, pmidKey, hasActiveQuery]);
 
   // Handle window resize for responsive charts
   useEffect(() => {
@@ -476,11 +494,21 @@ export default function Home() {
     const safeDisease = String(disease || '');
 
     daGetConcepts(safeDrug, safeDisease).then((data: any) => {
-      if (!data) {
+      const concepts: ConceptRow[] = Array.isArray(data) ? (data as ConceptRow[]) : [];
+      if (concepts.length === 0) {
+        setConcepts([]);
+        setPmidData([]);
+        setHasDrugSearched(false);
+        setOverallStudyType(prev => ({
+          ...prev,
+          pk: { ...prev.pk, count: 0 },
+          pe: { ...prev.pe, count: 0 },
+          ct: { ...prev.ct, count: 0 },
+        }));
+        setPopulationData([]);
         setIsLoadingPopulationData(false);
         return;
       }
-      const concepts: ConceptRow[] = data as ConceptRow[];
       const isDrugConceptQueried = concepts.some(concept => concept.type === "drug");
       setHasDrugSearched(isDrugConceptQueried);
       setConcepts(concepts);
