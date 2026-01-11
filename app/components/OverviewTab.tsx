@@ -3,6 +3,7 @@
 import React from 'react';
 import { Edit, User, Plus } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import WordCloud from './WordCloud';
 
 // Dynamically import Plotly to prevent SSR issues
 const Plot = dynamic(() => import('react-plotly.js'), { 
@@ -17,6 +18,9 @@ interface OverviewTabProps {
   clinicalChartData: any[];
   chartLayout: any;
   isLoadingPopulationData?: boolean;
+  maternalWordCloud: Array<[string, number]>;
+  pediatricWordCloud: Array<[string, number]>;
+  isLoadingWordCloud?: boolean;
 }
 
 export default function OverviewTab({ 
@@ -25,7 +29,10 @@ export default function OverviewTab({
   pharmChartData, 
   clinicalChartData, 
   chartLayout,
-  isLoadingPopulationData = false
+  isLoadingPopulationData = false,
+  maternalWordCloud,
+  pediatricWordCloud,
+  isLoadingWordCloud = false
 }: OverviewTabProps) {
   const isChartDataEmpty = (data: any[]) => {
     return !data || data.length === 0 || data[0].y.every((y: any) => parseInt(y) === 0);
@@ -159,6 +166,34 @@ export default function OverviewTab({
                 style={{ width: '100%', height: '100%', minHeight: '400px' }}
                 useResizeHandler={true}
               />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Word Clouds */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm min-h-[360px] flex flex-col">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Maternal MeSH word cloud</h3>
+          {isLoadingWordCloud ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">Generating word cloud...</p>
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0">
+              <WordCloud words={maternalWordCloud} theme="green" />
+            </div>
+          )}
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm min-h-[360px] flex flex-col">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Pediatric MeSH word cloud</h3>
+          {isLoadingWordCloud ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">Generating word cloud...</p>
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0">
+              <WordCloud words={pediatricWordCloud} theme="blue" />
             </div>
           )}
         </div>

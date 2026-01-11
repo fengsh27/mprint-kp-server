@@ -41,6 +41,9 @@ export const daGetPMIDs = (conceptIds: ConceptRow[], searchType: SearchType, opt
 export const daGetTypePopulation = (pmids: PmidRow[], opts?: { signal?: AbortSignal }) =>
   api.post<unknown>("/api/type_population", pmids, opts);
 
+export const daGetMeshTerms = (pmids: PmidRow[], opts?: { signal?: AbortSignal }) =>
+  api.post<unknown>("/api/mesh_terms", pmids, opts);
+
 export type StudyRequestOptions = {
   signal?: AbortSignal;
 };

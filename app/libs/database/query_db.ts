@@ -296,6 +296,40 @@ export const queriedType = async (pmids: string[]) => {
   );
 };
 
+export const queriedMeshTerms = async (pmids: string[]) => {
+  if (!pmids || pmids.length === 0) {
+    return { maternal: [], pediatric: [] };
+  }
+
+  const fetchMeshTerms = async (table: string) => {
+    const batchSize = 1000;
+    const results: string[] = [];
+
+    for (let i = 0; i < pmids.length; i += batchSize) {
+      const batch = pmids.slice(i, i + batchSize);
+      const sql = `
+        SELECT MeSH_terms_Descriptor AS descriptor, MeSH_terms_Qualifier AS qualifier
+        FROM ${table}
+        WHERE PMID IN (${placeholders(batch.length)})
+      `;
+      const [rows] = await pool.execute(sql, batch);
+      (rows as any[]).forEach((row) => {
+        if (row.descriptor) results.push(String(row.descriptor));
+        if (row.qualifier) results.push(String(row.qualifier));
+      });
+    }
+
+    return results;
+  };
+
+  const [maternal, pediatric] = await Promise.all([
+    fetchMeshTerms("maternal_database_with_scores"),
+    fetchMeshTerms("pediatric_database_with_scores")
+  ]);
+
+  return { maternal, pediatric };
+};
+
 export async function queriedStudyCount(pmidList: string[]): Promise<number> {
   if (!pmidList || pmidList.length === 0) {
     return 0;
@@ -382,7 +416,6 @@ export async function queriedStudy(pmidList: string[]): Promise<StudyResult[]> {
 
   return results;
 }
-
 
 
 

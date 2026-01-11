@@ -19,6 +19,7 @@ import {
   daGetOverallStudyType,
   daGetPMIDs,
   daGetStudy,
+  daGetMeshTerms,
   daGetDrugClassList,
   daGetDrugClassListByLevel,
   daExportStudy,
@@ -31,6 +32,7 @@ import {
 } from '../libs/database/types';
 import { calculateSummaryStats, preparePlotData, preparePopulationData } from '../libs/dataprocessor/utils';
 import { buildPublicationTable, PublicationTableRow } from './component-utils';
+import { buildWordCloudList } from '../libs/wordcloud';
 
 
 
@@ -217,6 +219,9 @@ export default function Home() {
       ticktext: []
     }
   });
+  const [maternalWordCloud, setMaternalWordCloud] = useState<Array<[string, number]>>([]);
+  const [pediatricWordCloud, setPediatricWordCloud] = useState<Array<[string, number]>>([]);
+  const [isLoadingWordCloud, setIsLoadingWordCloud] = useState(false);
 
   // initialize overview data
   // 1. populate overall study type
@@ -383,18 +388,18 @@ export default function Home() {
       setPopulationData(thePopulationData);
     };
 
-    const cached = cache.get(pmidKey);
-    if (cached) {
-      applyDerivedData(cached);
-      setPublicationData(buildPublicationTable(cached));
-      setPublicationCount(cached.length);
-      setIsLoadingPublications(false);
-      setIsLoadingPopulationData(false);
-      return () => {
-        isActive = false;
-        controller.abort();
-      };
-    }
+    // const cached = cache.get(pmidKey);
+    //if (cached) {
+    //  applyDerivedData(cached);
+    //  setPublicationData(buildPublicationTable(cached));
+    //  setPublicationCount(cached.length);
+    //  setIsLoadingPublications(false);
+    //  setIsLoadingPopulationData(false);
+    //  return () => {
+    //    isActive = false;
+    //    controller.abort();
+    //  };
+    //}
 
     setIsLoadingPublications(true);
     setPublicationData([]);
@@ -403,13 +408,13 @@ export default function Home() {
       .then((data: any) => {
         if (!isActive) return;
         const studyData = data as StudyData[];
-        cache.set(pmidKey, studyData);
-        if (cache.size > PUBLICATION_CACHE_LIMIT) {
-          const oldestKey = cache.keys().next().value;
-          if (oldestKey) {
-            cache.delete(oldestKey);
-          }
-        }
+        // cache.set(pmidKey, studyData);
+        // if (cache.size > PUBLICATION_CACHE_LIMIT) {
+        //  const oldestKey = cache.keys().next().value;
+        //  if (oldestKey) {
+        //    cache.delete(oldestKey);
+        //  }
+        //}
         applyDerivedData(studyData);
         setPublicationData(buildPublicationTable(studyData));
         setPublicationCount(studyData.length);
@@ -454,6 +459,47 @@ export default function Home() {
     setPharmChartData(pharmChartData);
     setClinicalChartData(clinicalChartData);
   }, [populationData]);
+
+  /*
+  useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+    let isActive = true;
+
+    if (!pmidData || pmidData.length === 0 || !pmidKey) {
+      setMaternalWordCloud([]);
+      setPediatricWordCloud([]);
+      setIsLoadingWordCloud(false);
+      return () => {
+        isActive = false;
+        controller.abort();
+      };
+    }
+
+    setIsLoadingWordCloud(true);
+    const excludeKeywords = [selectedDrug, selectedDisease].filter(Boolean);
+
+    daGetMeshTerms(pmidData, { signal })
+      .then((data: any) => {
+        if (!isActive) return;
+        const maternalTerms = (data?.maternal ?? []) as string[];
+        const pediatricTerms = (data?.pediatric ?? []) as string[];
+        setMaternalWordCloud(buildWordCloudList(maternalTerms, excludeKeywords));
+        setPediatricWordCloud(buildWordCloudList(pediatricTerms, excludeKeywords));
+        setIsLoadingWordCloud(false);
+      })
+      .catch((error: any) => {
+        if (!isActive || error?.name === "AbortError") return;
+        console.error("Error fetching mesh terms:", error);
+        setIsLoadingWordCloud(false);
+      });
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [pmidData, pmidKey, selectedDrug, selectedDisease]);
+  */
 
   function handleTabChange(value: string) {
     setIsTabSwitching(true);
@@ -742,6 +788,9 @@ export default function Home() {
                   clinicalChartData={clinicalChartData}
                   chartLayout={chartLayout}
                   isLoadingPopulationData={isLoadingPopulationData}
+                  maternalWordCloud={maternalWordCloud}
+                  pediatricWordCloud={pediatricWordCloud}
+                  isLoadingWordCloud={isLoadingWordCloud}
                 />
               )}
             </Tabs.Content>
