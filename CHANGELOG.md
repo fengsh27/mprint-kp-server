@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.17](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.16...v0.1.17) (2026-01-11)
+
+
+### Features
+
+* add scripts to save relevant scores to db ([#10](https://github.com/fengsh27/mprint-kp-server/issues/10)) ([9ffe65b](https://github.com/fengsh27/mprint-kp-server/commit/9ffe65b6fd088e6e7a74c0a8d77c5f0dba99e0bc))
+* publication ranking scores and optimize publications loading performance ([#11](https://github.com/fengsh27/mprint-kp-server/issues/11)) ([8f90aaa](https://github.com/fengsh27/mprint-kp-server/commit/8f90aaa984579831a64132a71ec7b9601854007b))
+
 ### [0.1.16](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.15...v0.1.16) (2026-01-01)
 
 ### [0.1.15](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.14...v0.1.15) (2025-12-13)

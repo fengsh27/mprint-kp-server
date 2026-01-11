@@ -38,7 +38,6 @@ import { buildWordCloudList } from '../libs/wordcloud';
 
 const DEFAULT_LOGO_WIDTH = 150;
 const DEFAULT_LOGO_HEIGHT = 182;
-const PUBLICATION_CACHE_LIMIT = 5;
 
 const logoSize = {
   w: 100,
@@ -178,7 +177,6 @@ export default function Home() {
   const [downloadType, setDownloadType] = useState<'xlsx' | 'csv' | 'tsv'>('xlsx');
   const [isExporting, setIsExporting] = useState(false);
 
-  const studyCacheRef = useRef(new Map<string, StudyData[]>());
   const pmidKey = useMemo(() => {
     if (!pmidData || pmidData.length === 0) {
       return '';
@@ -222,6 +220,14 @@ export default function Home() {
   const [maternalWordCloud, setMaternalWordCloud] = useState<Array<[string, number]>>([]);
   const [pediatricWordCloud, setPediatricWordCloud] = useState<Array<[string, number]>>([]);
   const [isLoadingWordCloud, setIsLoadingWordCloud] = useState(false);
+  const hasActiveQuery = Boolean(
+    queryDrug?.trim() ||
+    queryDisease?.trim() ||
+    queryDrugClass?.trim() ||
+    selectedDrug?.trim() ||
+    selectedDisease?.trim() ||
+    selectedDrugClass?.trim()
+  );
 
   // initialize overview data
   // 1. populate overall study type
@@ -352,14 +358,23 @@ export default function Home() {
       setPublicationCount(0);
       setIsLoadingPublications(false);
       setIsLoadingPopulationData(false);
-      setPopulationData(DEFAULT_POPULATION_DATA);
+      if (hasActiveQuery) {
+        setOverallStudyType(prev => ({
+          ...prev,
+          pk: { ...prev.pk, count: 0 },
+          pe: { ...prev.pe, count: 0 },
+          ct: { ...prev.ct, count: 0 },
+        }));
+        setPopulationData([]);
+      } else {
+        setPopulationData(DEFAULT_POPULATION_DATA);
+      }
       return () => {
         isActive = false;
         controller.abort();
       };
     }
 
-    const cache = studyCacheRef.current;
     const applyDerivedData = (studyData: StudyData[]) => {
       const derivedTypeData = studyData.map(item => ({
         pmid: item.PMID,
@@ -388,19 +403,6 @@ export default function Home() {
       setPopulationData(thePopulationData);
     };
 
-    // const cached = cache.get(pmidKey);
-    //if (cached) {
-    //  applyDerivedData(cached);
-    //  setPublicationData(buildPublicationTable(cached));
-    //  setPublicationCount(cached.length);
-    //  setIsLoadingPublications(false);
-    //  setIsLoadingPopulationData(false);
-    //  return () => {
-    //    isActive = false;
-    //    controller.abort();
-    //  };
-    //}
-
     setIsLoadingPublications(true);
     setPublicationData([]);
 
@@ -408,13 +410,7 @@ export default function Home() {
       .then((data: any) => {
         if (!isActive) return;
         const studyData = data as StudyData[];
-        // cache.set(pmidKey, studyData);
-        // if (cache.size > PUBLICATION_CACHE_LIMIT) {
-        //  const oldestKey = cache.keys().next().value;
-        //  if (oldestKey) {
-        //    cache.delete(oldestKey);
-        //  }
-        //}
+
         applyDerivedData(studyData);
         setPublicationData(buildPublicationTable(studyData));
         setPublicationCount(studyData.length);
@@ -432,7 +428,7 @@ export default function Home() {
       isActive = false;
       controller.abort();
     };
-  }, [pmidData, pmidKey]);
+  }, [pmidData, pmidKey, hasActiveQuery]);
 
   // Handle window resize for responsive charts
   useEffect(() => {
@@ -460,7 +456,7 @@ export default function Home() {
     setClinicalChartData(clinicalChartData);
   }, [populationData]);
 
-  /*
+
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
@@ -499,7 +495,6 @@ export default function Home() {
       controller.abort();
     };
   }, [pmidData, pmidKey, selectedDrug, selectedDisease]);
-  */
 
   function handleTabChange(value: string) {
     setIsTabSwitching(true);
@@ -522,11 +517,21 @@ export default function Home() {
     const safeDisease = String(disease || '');
 
     daGetConcepts(safeDrug, safeDisease).then((data: any) => {
-      if (!data) {
+      const concepts: ConceptRow[] = Array.isArray(data) ? (data as ConceptRow[]) : [];
+      if (concepts.length === 0) {
+        setConcepts([]);
+        setPmidData([]);
+        setHasDrugSearched(false);
+        setOverallStudyType(prev => ({
+          ...prev,
+          pk: { ...prev.pk, count: 0 },
+          pe: { ...prev.pe, count: 0 },
+          ct: { ...prev.ct, count: 0 },
+        }));
+        setPopulationData([]);
         setIsLoadingPopulationData(false);
         return;
       }
-      const concepts: ConceptRow[] = data as ConceptRow[];
       const isDrugConceptQueried = concepts.some(concept => concept.type === "drug");
       setHasDrugSearched(isDrugConceptQueried);
       setConcepts(concepts);
