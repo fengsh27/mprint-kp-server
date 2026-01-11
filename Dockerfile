@@ -63,6 +63,7 @@ RUN chown nextjs:nodejs .next
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/word_cloud_generator.py ./scripts/word_cloud_generator.py
 
 # Copy data directory including drug_class.db
 COPY --from=builder --chown=nextjs:nodejs /app/data ./data
