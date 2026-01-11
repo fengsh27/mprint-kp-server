@@ -301,8 +301,8 @@ export const queriedMeshTerms = async (pmids: string[]) => {
     return { maternal: [], pediatric: [] };
   }
 
+  const batchSize = 1000;
   const fetchMeshTerms = async (table: string) => {
-    const batchSize = 1000;
     const results: string[] = [];
 
     for (let i = 0; i < pmids.length; i += batchSize) {
@@ -335,7 +335,7 @@ export async function queriedStudyCount(pmidList: string[]): Promise<number> {
     return 0;
   }
 
-  const batchSize = 1000;
+  const batchSize = 10000;
   const totalBatches = Math.ceil(pmidList.length / batchSize);
   let totalCount = 0;
 
@@ -416,6 +416,4 @@ export async function queriedStudy(pmidList: string[]): Promise<StudyResult[]> {
 
   return results;
 }
-
-
 
