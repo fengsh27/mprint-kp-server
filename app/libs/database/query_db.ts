@@ -296,12 +296,90 @@ export const queriedType = async (pmids: string[]) => {
   );
 };
 
+export const queriedMeshTerms = async (pmids: string[]) => {
+  if (!pmids || pmids.length === 0) {
+    return { maternal: [], pediatric: [] };
+  }
+
+  const batchSize = 1000;
+  const fetchMeshTerms = async (table: string) => {
+    const results: string[] = [];
+
+    for (let i = 0; i < pmids.length; i += batchSize) {
+      const batch = pmids.slice(i, i + batchSize);
+      const sql = `
+        SELECT MeSH_terms_Descriptor AS descriptor, MeSH_terms_Qualifier AS qualifier
+        FROM ${table}
+        WHERE PMID IN (${placeholders(batch.length)})
+      `;
+      const [rows] = await pool.execute(sql, batch);
+      (rows as any[]).forEach((row) => {
+        if (row.descriptor) results.push(String(row.descriptor));
+        if (row.qualifier) results.push(String(row.qualifier));
+      });
+    }
+
+    return results;
+  };
+
+  const [maternal, pediatric] = await Promise.all([
+    fetchMeshTerms("maternal_database_with_scores"),
+    fetchMeshTerms("pediatric_database_with_scores")
+  ]);
+
+  return { maternal, pediatric };
+};
+
+export const queriedMeshTermRows = async (pmids: string[]) => {
+  if (!pmids || pmids.length === 0) {
+    return { maternal: [], pediatric: [] };
+  }
+
+  const batchSize = 1000;
+  const maternal: { pmid: string; descriptor: string | null; qualifier: string | null }[] = [];
+  const pediatric: { pmid: string; descriptor: string | null; qualifier: string | null }[] = [];
+
+  for (let i = 0; i < pmids.length; i += batchSize) {
+    const batch = pmids.slice(i, i + batchSize);
+    const maternalSql = `
+      SELECT PMID AS pmid,
+        MeSH_terms_Descriptor AS descriptor,
+        MeSH_terms_Qualifier AS qualifier
+      FROM maternal_database_with_scores
+      WHERE PMID IN (${placeholders(batch.length)})
+    `;
+    const pediatricSql = `
+      SELECT PMID AS pmid,
+        MeSH_terms_Descriptor AS descriptor,
+        MeSH_terms_Qualifier AS qualifier
+      FROM pediatric_database_with_scores
+      WHERE PMID IN (${placeholders(batch.length)})
+    `;
+
+    const [maternalRows] = await pool.execute(maternalSql, batch);
+    const [pediatricRows] = await pool.execute(pediatricSql, batch);
+
+    maternal.push(...(maternalRows as any[]).map((row) => ({
+      pmid: String(row.pmid),
+      descriptor: row.descriptor ?? null,
+      qualifier: row.qualifier ?? null
+    })));
+    pediatric.push(...(pediatricRows as any[]).map((row) => ({
+      pmid: String(row.pmid),
+      descriptor: row.descriptor ?? null,
+      qualifier: row.qualifier ?? null
+    })));
+  }
+
+  return { maternal, pediatric };
+};
+
 export async function queriedStudyCount(pmidList: string[]): Promise<number> {
   if (!pmidList || pmidList.length === 0) {
     return 0;
   }
 
-  const batchSize = 1000;
+  const batchSize = 10000;
   const totalBatches = Math.ceil(pmidList.length / batchSize);
   let totalCount = 0;
 
@@ -382,7 +460,3 @@ export async function queriedStudy(pmidList: string[]): Promise<StudyResult[]> {
 
   return results;
 }
-
-
-
-

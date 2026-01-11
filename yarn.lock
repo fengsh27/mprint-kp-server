@@ -789,6 +789,11 @@
   dependencies:
     "@types/geojson" "*"
 
+"@types/wordcloud@^1.2.2":
+  version "1.2.2"
+  resolved "https://registry.npmjs.org/@types/wordcloud/-/wordcloud-1.2.2.tgz"
+  integrity sha512-UMKd/doXE3karDUd5l+2LqFKUU4SmuPWOT/VA22OrPOUGMlb8/qQvSf+DBLQf/sd8UphuBGxOK/jB/1BB5oQRw==
+
 abort-controller@^3.0.0:
   version "3.0.0"
   resolved "https://registry.npmjs.org/abort-controller/-/abort-controller-3.0.0.tgz"
@@ -4568,6 +4573,11 @@ which@^4.0.0:
   integrity sha512-GlaYyEb07DPxYCKhKzplCWBJtvxZcZMrL+4UkrTSJHHPyZU4mYYTv3qaOe77H7EODLSSopAUFAc6W8U4yqvscg==
   dependencies:
     isexe "^3.1.1"
+
+wordcloud@^1.2.3:
+  version "1.2.3"
+  resolved "https://registry.npmjs.org/wordcloud/-/wordcloud-1.2.3.tgz"
+  integrity sha512-9by77b7Sd9e1K75kSmVeAD+JnGpiLR1Z4EX1mYQL91jKrU1/4bHw4h4DExQ+dzfT+PvihDcH7OS7V4Y5UkbF2w==
 
 wordwrap@^1.0.0:
   version "1.0.0"

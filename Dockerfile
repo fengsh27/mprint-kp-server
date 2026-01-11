@@ -1,4 +1,4 @@
-# Use Node.js 18 Alpine as base image for smaller size
+# Use Node.js 22 Alpine as base image for build steps
 FROM node:22.21-alpine AS base
 
 # Install dependencies only when needed
@@ -24,13 +24,34 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
 
+# Node runtime layer for the final image
+FROM base AS node_runtime
+
 # Production image, copy all the files and run next
-FROM base AS runner
+FROM python:3.13-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED=1
+
+COPY --from=builder /app/requirements.txt ./requirements.txt
+COPY --from=node_runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=node_runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
+
+RUN apk add --no-cache \
+    py3-pip \
+    libstdc++ \
+    freetype \
+    libpng \
+  && apk add --no-cache --virtual .build-deps \
+    build-base \
+    python3-dev \
+    musl-dev \
+    freetype-dev \
+    libpng-dev \
+  && python3 -m pip install --no-cache-dir -r requirements.txt \
+  && apk del .build-deps
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -45,6 +66,7 @@ RUN chown nextjs:nodejs .next
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/word_cloud_generator.py ./scripts/word_cloud_generator.py
 
 # Copy data directory including drug_class.db
 COPY --from=builder --chown=nextjs:nodejs /app/data ./data

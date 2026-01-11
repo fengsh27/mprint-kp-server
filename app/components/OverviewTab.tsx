@@ -17,6 +17,9 @@ interface OverviewTabProps {
   clinicalChartData: any[];
   chartLayout: any;
   isLoadingPopulationData?: boolean;
+  maternalWordCloudSvg: string;
+  pediatricWordCloudSvg: string;
+  isLoadingWordCloud?: boolean;
 }
 
 export default function OverviewTab({ 
@@ -25,14 +28,43 @@ export default function OverviewTab({
   pharmChartData, 
   clinicalChartData, 
   chartLayout,
-  isLoadingPopulationData = false
+  isLoadingPopulationData = false,
+  maternalWordCloudSvg,
+  pediatricWordCloudSvg,
+  isLoadingWordCloud = false
 }: OverviewTabProps) {
   const isChartDataEmpty = (data: any[]) => {
     return !data || data.length === 0 || data[0].y.every((y: any) => parseInt(y) === 0);
   }
 
+  const normalizeSvg = (svg: string) => {
+    if (!svg) return "";
+    const widthMatch = svg.match(/width="([\d.]+)"/);
+    const heightMatch = svg.match(/height="([\d.]+)"/);
+    let updated = svg.replace(/width="[^"]*"/, 'width="100%"').replace(/height="[^"]*"/, 'height="100%"');
+    if (!/viewBox=/.test(updated) && widthMatch && heightMatch) {
+      updated = updated.replace(
+        "<svg",
+        `<svg viewBox="0 0 ${widthMatch[1]} ${heightMatch[1]}" preserveAspectRatio="xMidYMid meet"`
+      );
+    } else if (!/preserveAspectRatio=/.test(updated)) {
+      updated = updated.replace("<svg", '<svg preserveAspectRatio="xMidYMid meet"');
+    }
+    return updated;
+  };
+
+  const maternalSvg = normalizeSvg(maternalWordCloudSvg);
+  const pediatricSvg = normalizeSvg(pediatricWordCloudSvg);
+
   return (
     <div className="space-y-6">
+      <style>{`
+        .wordcloud-svg svg {
+          width: 100% !important;
+          height: 100% !important;
+          display: block;
+        }
+      `}</style>
       {/* Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-2xl">
@@ -159,6 +191,44 @@ export default function OverviewTab({
                 style={{ width: '100%', height: '100%', minHeight: '400px' }}
                 useResizeHandler={true}
               />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Word Clouds */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm min-h-[360px] flex flex-col">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Maternal MeSH word cloud</h3>
+          {isLoadingWordCloud ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">Generating word cloud...</p>
+            </div>
+          ) : maternalSvg ? (
+            <div
+              className="flex-1 min-h-0 h-full wordcloud-svg"
+              dangerouslySetInnerHTML={{ __html: maternalSvg }}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">No terms available</p>
+            </div>
+          )}
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm min-h-[360px] flex flex-col">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Pediatric MeSH word cloud</h3>
+          {isLoadingWordCloud ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">Generating word cloud...</p>
+            </div>
+          ) : pediatricSvg ? (
+            <div
+              className="flex-1 min-h-0 h-full wordcloud-svg"
+              dangerouslySetInnerHTML={{ __html: pediatricSvg }}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">No terms available</p>
             </div>
           )}
         </div>

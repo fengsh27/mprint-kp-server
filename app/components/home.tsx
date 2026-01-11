@@ -19,6 +19,7 @@ import {
   daGetOverallStudyType,
   daGetPMIDs,
   daGetStudy,
+  daGetWordClouds,
   daGetDrugClassList,
   daGetDrugClassListByLevel,
   daExportStudy,
@@ -36,7 +37,6 @@ import { buildPublicationTable, PublicationTableRow } from './component-utils';
 
 const DEFAULT_LOGO_WIDTH = 150;
 const DEFAULT_LOGO_HEIGHT = 182;
-const PUBLICATION_CACHE_LIMIT = 5;
 
 const logoSize = {
   w: 100,
@@ -176,7 +176,6 @@ export default function Home() {
   const [downloadType, setDownloadType] = useState<'xlsx' | 'csv' | 'tsv'>('xlsx');
   const [isExporting, setIsExporting] = useState(false);
 
-  const studyCacheRef = useRef(new Map<string, StudyData[]>());
   const pmidKey = useMemo(() => {
     if (!pmidData || pmidData.length === 0) {
       return '';
@@ -217,6 +216,9 @@ export default function Home() {
       ticktext: []
     }
   });
+  const [maternalWordCloudSvg, setMaternalWordCloudSvg] = useState("");
+  const [pediatricWordCloudSvg, setPediatricWordCloudSvg] = useState("");
+  const [isLoadingWordCloud, setIsLoadingWordCloud] = useState(false);
   const hasActiveQuery = Boolean(
     queryDrug?.trim() ||
     queryDisease?.trim() ||
@@ -372,7 +374,6 @@ export default function Home() {
       };
     }
 
-    const cache = studyCacheRef.current;
     const applyDerivedData = (studyData: StudyData[]) => {
       const derivedTypeData = studyData.map(item => ({
         pmid: item.PMID,
@@ -401,19 +402,6 @@ export default function Home() {
       setPopulationData(thePopulationData);
     };
 
-    const cached = cache.get(pmidKey);
-    if (cached) {
-      applyDerivedData(cached);
-      setPublicationData(buildPublicationTable(cached));
-      setPublicationCount(cached.length);
-      setIsLoadingPublications(false);
-      setIsLoadingPopulationData(false);
-      return () => {
-        isActive = false;
-        controller.abort();
-      };
-    }
-
     setIsLoadingPublications(true);
     setPublicationData([]);
 
@@ -421,13 +409,7 @@ export default function Home() {
       .then((data: any) => {
         if (!isActive) return;
         const studyData = data as StudyData[];
-        cache.set(pmidKey, studyData);
-        if (cache.size > PUBLICATION_CACHE_LIMIT) {
-          const oldestKey = cache.keys().next().value;
-          if (oldestKey) {
-            cache.delete(oldestKey);
-          }
-        }
+
         applyDerivedData(studyData);
         setPublicationData(buildPublicationTable(studyData));
         setPublicationCount(studyData.length);
@@ -472,6 +454,43 @@ export default function Home() {
     setPharmChartData(pharmChartData);
     setClinicalChartData(clinicalChartData);
   }, [populationData]);
+
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+    let isActive = true;
+
+    if (!pmidData || pmidData.length === 0 || !pmidKey) {
+      setMaternalWordCloudSvg("");
+      setPediatricWordCloudSvg("");
+      setIsLoadingWordCloud(false);
+      return () => {
+        isActive = false;
+        controller.abort();
+      };
+    }
+
+    setIsLoadingWordCloud(true);
+    const searchWords = [selectedDrug, selectedDisease].filter(Boolean);
+    daGetWordClouds(pmidData, searchWords, { signal })
+      .then((data: any) => {
+        if (!isActive) return;
+        setMaternalWordCloudSvg(data?.maternal ?? "");
+        setPediatricWordCloudSvg(data?.pediatric ?? "");
+        setIsLoadingWordCloud(false);
+      })
+      .catch((error: any) => {
+        if (!isActive || error?.name === "AbortError") return;
+        console.error("Error fetching mesh terms:", error);
+        setIsLoadingWordCloud(false);
+      });
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [pmidData, pmidKey, selectedDrug, selectedDisease]);
 
   function handleTabChange(value: string) {
     setIsTabSwitching(true);
@@ -770,6 +789,9 @@ export default function Home() {
                   clinicalChartData={clinicalChartData}
                   chartLayout={chartLayout}
                   isLoadingPopulationData={isLoadingPopulationData}
+                  maternalWordCloudSvg={maternalWordCloudSvg}
+                  pediatricWordCloudSvg={pediatricWordCloudSvg}
+                  isLoadingWordCloud={isLoadingWordCloud}
                 />
               )}
             </Tabs.Content>

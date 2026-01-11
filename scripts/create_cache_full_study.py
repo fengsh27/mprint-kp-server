@@ -83,6 +83,8 @@ def ensure_indexes(cursor) -> None:
         ("new_pmid2drug", "idx_new_pmid2drug_pmid", "pmid"),
         ("new_pmid2disease", "idx_new_pmid2disease_pmid", "pmid"),
         ("new_population", "idx_new_population_pmid", "pmid"),
+        ("maternal_database_with_scores", "idx_maternal_database_with_scores_pmid", "PMID"),
+        ("pediatric_database_with_scores", "idx_pediatric_database_with_scores_pmid", "PMID"),
         ("maternal_database_with_scores", "idx_maternal_scores_pmid", "PMID"),
         ("pediatric_database_with_scores", "idx_pediatric_scores_pmid", "PMID"),
     ]
