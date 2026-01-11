@@ -32,6 +32,24 @@ ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED=1
 
+ARG ALPINE_PYTHON_VERSION=3.13.0-r0
+
+COPY --from=builder /app/requirements.txt ./requirements.txt
+
+RUN apk add --no-cache \
+    python3=${ALPINE_PYTHON_VERSION} \
+    py3-pip \
+    freetype \
+    libpng \
+  && apk add --no-cache --virtual .build-deps \
+    build-base \
+    python3-dev=${ALPINE_PYTHON_VERSION} \
+    musl-dev \
+    freetype-dev \
+    libpng-dev \
+  && python3 -m pip install --no-cache-dir -r requirements.txt \
+  && apk del .build-deps
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 

@@ -44,6 +44,12 @@ export const daGetTypePopulation = (pmids: PmidRow[], opts?: { signal?: AbortSig
 export const daGetMeshTerms = (pmids: PmidRow[], opts?: { signal?: AbortSignal }) =>
   api.post<unknown>("/api/mesh_terms", pmids, opts);
 
+export const daGetWordClouds = (
+  pmids: PmidRow[],
+  searchWords: string[],
+  opts?: { signal?: AbortSignal }
+) => api.post<unknown>("/api/word_clouds", { pmids, search_words: searchWords }, opts);
+
 export type StudyRequestOptions = {
   signal?: AbortSignal;
 };

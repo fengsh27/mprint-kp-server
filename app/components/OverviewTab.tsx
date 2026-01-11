@@ -3,7 +3,6 @@
 import React from 'react';
 import { Edit, User, Plus } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import WordCloud from './WordCloud';
 
 // Dynamically import Plotly to prevent SSR issues
 const Plot = dynamic(() => import('react-plotly.js'), { 
@@ -18,8 +17,8 @@ interface OverviewTabProps {
   clinicalChartData: any[];
   chartLayout: any;
   isLoadingPopulationData?: boolean;
-  maternalWordCloud: Array<[string, number]>;
-  pediatricWordCloud: Array<[string, number]>;
+  maternalWordCloudSvg: string;
+  pediatricWordCloudSvg: string;
   isLoadingWordCloud?: boolean;
 }
 
@@ -30,16 +29,42 @@ export default function OverviewTab({
   clinicalChartData, 
   chartLayout,
   isLoadingPopulationData = false,
-  maternalWordCloud,
-  pediatricWordCloud,
+  maternalWordCloudSvg,
+  pediatricWordCloudSvg,
   isLoadingWordCloud = false
 }: OverviewTabProps) {
   const isChartDataEmpty = (data: any[]) => {
     return !data || data.length === 0 || data[0].y.every((y: any) => parseInt(y) === 0);
   }
 
+  const normalizeSvg = (svg: string) => {
+    if (!svg) return "";
+    const widthMatch = svg.match(/width="([\d.]+)"/);
+    const heightMatch = svg.match(/height="([\d.]+)"/);
+    let updated = svg.replace(/width="[^"]*"/, 'width="100%"').replace(/height="[^"]*"/, 'height="100%"');
+    if (!/viewBox=/.test(updated) && widthMatch && heightMatch) {
+      updated = updated.replace(
+        "<svg",
+        `<svg viewBox="0 0 ${widthMatch[1]} ${heightMatch[1]}" preserveAspectRatio="xMidYMid meet"`
+      );
+    } else if (!/preserveAspectRatio=/.test(updated)) {
+      updated = updated.replace("<svg", '<svg preserveAspectRatio="xMidYMid meet"');
+    }
+    return updated;
+  };
+
+  const maternalSvg = normalizeSvg(maternalWordCloudSvg);
+  const pediatricSvg = normalizeSvg(pediatricWordCloudSvg);
+
   return (
     <div className="space-y-6">
+      <style>{`
+        .wordcloud-svg svg {
+          width: 100% !important;
+          height: 100% !important;
+          display: block;
+        }
+      `}</style>
       {/* Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-2xl">
@@ -179,9 +204,14 @@ export default function OverviewTab({
             <div className="flex items-center justify-center h-full">
               <p className="text-gray-500">Generating word cloud...</p>
             </div>
+          ) : maternalSvg ? (
+            <div
+              className="flex-1 min-h-0 h-full wordcloud-svg"
+              dangerouslySetInnerHTML={{ __html: maternalSvg }}
+            />
           ) : (
-            <div className="flex-1 min-h-0">
-              <WordCloud words={maternalWordCloud} theme="green" />
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">No terms available</p>
             </div>
           )}
         </div>
@@ -191,9 +221,14 @@ export default function OverviewTab({
             <div className="flex items-center justify-center h-full">
               <p className="text-gray-500">Generating word cloud...</p>
             </div>
+          ) : pediatricSvg ? (
+            <div
+              className="flex-1 min-h-0 h-full wordcloud-svg"
+              dangerouslySetInnerHTML={{ __html: pediatricSvg }}
+            />
           ) : (
-            <div className="flex-1 min-h-0">
-              <WordCloud words={pediatricWordCloud} theme="blue" />
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-500">No terms available</p>
             </div>
           )}
         </div>

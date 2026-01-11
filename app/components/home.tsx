@@ -19,7 +19,7 @@ import {
   daGetOverallStudyType,
   daGetPMIDs,
   daGetStudy,
-  daGetMeshTerms,
+  daGetWordClouds,
   daGetDrugClassList,
   daGetDrugClassListByLevel,
   daExportStudy,
@@ -32,7 +32,6 @@ import {
 } from '../libs/database/types';
 import { calculateSummaryStats, preparePlotData, preparePopulationData } from '../libs/dataprocessor/utils';
 import { buildPublicationTable, PublicationTableRow } from './component-utils';
-import { buildWordCloudList } from '../libs/wordcloud';
 
 
 
@@ -217,8 +216,8 @@ export default function Home() {
       ticktext: []
     }
   });
-  const [maternalWordCloud, setMaternalWordCloud] = useState<Array<[string, number]>>([]);
-  const [pediatricWordCloud, setPediatricWordCloud] = useState<Array<[string, number]>>([]);
+  const [maternalWordCloudSvg, setMaternalWordCloudSvg] = useState("");
+  const [pediatricWordCloudSvg, setPediatricWordCloudSvg] = useState("");
   const [isLoadingWordCloud, setIsLoadingWordCloud] = useState(false);
   const hasActiveQuery = Boolean(
     queryDrug?.trim() ||
@@ -463,8 +462,8 @@ export default function Home() {
     let isActive = true;
 
     if (!pmidData || pmidData.length === 0 || !pmidKey) {
-      setMaternalWordCloud([]);
-      setPediatricWordCloud([]);
+      setMaternalWordCloudSvg("");
+      setPediatricWordCloudSvg("");
       setIsLoadingWordCloud(false);
       return () => {
         isActive = false;
@@ -473,15 +472,12 @@ export default function Home() {
     }
 
     setIsLoadingWordCloud(true);
-    const excludeKeywords = [selectedDrug, selectedDisease].filter(Boolean);
-
-    daGetMeshTerms(pmidData, { signal })
+    const searchWords = [selectedDrug, selectedDisease].filter(Boolean);
+    daGetWordClouds(pmidData, searchWords, { signal })
       .then((data: any) => {
         if (!isActive) return;
-        const maternalTerms = (data?.maternal ?? []) as string[];
-        const pediatricTerms = (data?.pediatric ?? []) as string[];
-        setMaternalWordCloud(buildWordCloudList(maternalTerms, excludeKeywords));
-        setPediatricWordCloud(buildWordCloudList(pediatricTerms, excludeKeywords));
+        setMaternalWordCloudSvg(data?.maternal ?? "");
+        setPediatricWordCloudSvg(data?.pediatric ?? "");
         setIsLoadingWordCloud(false);
       })
       .catch((error: any) => {
@@ -793,8 +789,8 @@ export default function Home() {
                   clinicalChartData={clinicalChartData}
                   chartLayout={chartLayout}
                   isLoadingPopulationData={isLoadingPopulationData}
-                  maternalWordCloud={maternalWordCloud}
-                  pediatricWordCloud={pediatricWordCloud}
+                  maternalWordCloudSvg={maternalWordCloudSvg}
+                  pediatricWordCloudSvg={pediatricWordCloudSvg}
                   isLoadingWordCloud={isLoadingWordCloud}
                 />
               )}
