@@ -1,4 +1,4 @@
-# Use Node.js 18 Alpine as base image for smaller size
+# Use Node.js 22 Alpine as base image for build steps
 FROM node:22.21-alpine AS base
 
 # Install dependencies only when needed
@@ -24,26 +24,29 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
 
+# Node runtime layer for the final image
+FROM base AS node_runtime
+
 # Production image, copy all the files and run next
-FROM base AS runner
+FROM python:3.13-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED=1
 
-ARG ALPINE_PYTHON_VERSION=3.13.0-r0
-
 COPY --from=builder /app/requirements.txt ./requirements.txt
+COPY --from=node_runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=node_runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 RUN apk add --no-cache \
-    python3=${ALPINE_PYTHON_VERSION} \
     py3-pip \
+    libstdc++ \
     freetype \
     libpng \
   && apk add --no-cache --virtual .build-deps \
     build-base \
-    python3-dev=${ALPINE_PYTHON_VERSION} \
+    python3-dev \
     musl-dev \
     freetype-dev \
     libpng-dev \
