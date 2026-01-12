@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import pool from "../../libs/database/silverdb";
 import { queriedMeshTermRows } from "../../libs/database/query_db";
 import { withRateLimit, searchRateLimiter } from "../../libs/middleware/rateLimiter";
 import {
@@ -17,6 +18,16 @@ import {
 import { MAX_QUERIED_ARRAY_LENGTH } from "../../libs/constants";
 
 const execFileAsync = promisify(execFile);
+const THEMES = [
+  "blue",
+  "dark_blue",
+  "orange",
+  "green",
+  "slate",
+  "teal",
+  "burgundy",
+  "charcoal"
+];
 
 type MeshRow = { pmid: string; descriptor: string | null; qualifier: string | null };
 
@@ -45,12 +56,50 @@ const buildCsv = (rows: MeshRow[]) => {
   return lines.join("\n");
 };
 
-async function generateSvg(csvPath: string, outputPath: string, searchWords: string[]) {
+async function ensureCacheTable() {
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS cache_word_cloud (
+      cache_key VARCHAR(255) PRIMARY KEY,
+      svg LONGTEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+}
+
+async function fetchCachedSvg(cacheKey: string) {
+  const [rows] = await pool.execute(
+    "SELECT svg FROM cache_word_cloud WHERE cache_key = ?",
+    [cacheKey]
+  );
+  return (rows as any[])[0]?.svg as string | undefined;
+}
+
+async function storeCachedSvg(cacheKey: string, svg: string) {
+  await pool.execute(
+    `
+    INSERT INTO cache_word_cloud (cache_key, svg)
+    VALUES (?, ?)
+    ON DUPLICATE KEY UPDATE svg = VALUES(svg)
+    `,
+    [cacheKey, svg]
+  );
+}
+
+const pickTheme = () => THEMES[Math.floor(Math.random() * THEMES.length)];
+
+async function generateSvg(
+  csvPath: string,
+  outputPath: string,
+  searchWords: string[],
+  theme: string
+) {
   const scriptPath = path.join(process.cwd(), "scripts", "word_cloud_generator.py");
   const searchArg = searchWords.join(",");
-  await execFileAsync("python", [scriptPath, "--csv", csvPath, "--output", outputPath, "--search_words", searchArg], {
-    timeout: 120000
-  });
+  await execFileAsync(
+    "python",
+    [scriptPath, "--csv", csvPath, "--output", outputPath, "--search_words", searchArg, "--theme", theme],
+    { timeout: 120000 }
+  );
   return readFile(outputPath, "utf-8");
 }
 
@@ -69,6 +118,9 @@ async function wordCloudHandler(req: Request) {
   try {
     const body = await req.json();
     const items = Array.isArray(body) ? body : body?.pmids;
+    const searchWords = Array.isArray(body?.search_words)
+      ? body.search_words.filter((item: unknown) => typeof item === "string")
+      : [];
 
     if (!Array.isArray(items)) {
       logSecurityEvent(req as any, "INVALID_INPUT", { error: "Request body must include pmids" });
@@ -126,11 +178,24 @@ async function wordCloudHandler(req: Request) {
 
     const pmids = items.map((item: any) => item.pmid);
     const sanitizedPmids = sanitizeInput(pmids);
-    const meshRows = await queriedMeshTermRows(sanitizedPmids);
-    const searchWords = Array.isArray(body?.search_words)
-      ? body.search_words.filter((item: unknown) => typeof item === "string")
-      : [];
 
+    const searchKey = searchWords.join(",");
+    const maternalKey = `${searchKey}-${pmids.length}-maternal`;
+    const pediatricKey = `${searchKey}-${pmids.length}-pediatric`;
+
+    await ensureCacheTable();
+
+    const [cachedMaternal, cachedPediatric] = await Promise.all([
+      fetchCachedSvg(maternalKey),
+      fetchCachedSvg(pediatricKey)
+    ]);
+
+    if (cachedMaternal && cachedPediatric) {
+      const response = NextResponse.json({ maternal: cachedMaternal, pediatric: cachedPediatric });
+      return addSecurityHeaders(response);
+    }
+
+    const meshRows = await queriedMeshTermRows(sanitizedPmids);
     const tempFolder = process.env.TEMP_FOLDER || "/tmp";
     await mkdir(tempFolder, { recursive: true });
     const runId = randomUUID();
@@ -142,9 +207,14 @@ async function wordCloudHandler(req: Request) {
     await writeFile(maternalCsv, buildCsv(meshRows.maternal), "utf-8");
     await writeFile(pediatricCsv, buildCsv(meshRows.pediatric), "utf-8");
 
+    const theme = pickTheme();
     const [maternalSvgText, pediatricSvgText] = await Promise.all([
-      generateSvg(maternalCsv, maternalSvg, searchWords),
-      generateSvg(pediatricCsv, pediatricSvg, searchWords)
+      cachedMaternal
+        ? Promise.resolve(cachedMaternal)
+        : generateSvg(maternalCsv, maternalSvg, searchWords, theme),
+      cachedPediatric
+        ? Promise.resolve(cachedPediatric)
+        : generateSvg(pediatricCsv, pediatricSvg, searchWords, theme)
     ]);
 
     await Promise.all([
@@ -152,6 +222,11 @@ async function wordCloudHandler(req: Request) {
       rm(pediatricCsv, { force: true }),
       rm(maternalSvg, { force: true }),
       rm(pediatricSvg, { force: true })
+    ]);
+
+    await Promise.all([
+      cachedMaternal ? Promise.resolve() : storeCachedSvg(maternalKey, maternalSvgText),
+      cachedPediatric ? Promise.resolve() : storeCachedSvg(pediatricKey, pediatricSvgText)
     ]);
 
     const requestEndTime = performance.now();

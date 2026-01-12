@@ -555,12 +555,12 @@ export default function Home() {
       return; // Don't search if no parameters are selected
     }
     // Clear drug class when searching in Advanced mode (since Advanced mode uses drug/disease)
+    setConcepts([]);
+    setPmidData([]);
     setSelectedDrugClass('');
     setQueryDrugClass('');
     setQueryDrug(selectedDrug ?? "");
     setQueryDisease(selectedDisease ?? "");
-    setConcepts([]);
-    setPmidData([]);
     setPublicationData([]);
     handleTabChange("overview");
     handleConceptChange(selectedDrug, selectedDisease);
@@ -598,6 +598,10 @@ export default function Home() {
   }
 
   function handleDrugChange(drug: string) {
+    if (searchMode === 'simple') {
+      setPmidData([]);
+      setPublicationData([]);
+    }
     setSelectedDrug(drug);
     if (searchMode === 'simple') {
       setQueryDrug(drug);
