@@ -55,6 +55,9 @@ export default function OverviewTab({
 
   const maternalSvg = normalizeSvg(maternalWordCloudSvg);
   const pediatricSvg = normalizeSvg(pediatricWordCloudSvg);
+  const showMaternalWordCloud = isLoadingWordCloud || Boolean(maternalSvg);
+  const showPediatricWordCloud = isLoadingWordCloud || Boolean(pediatricSvg);
+  const showWordClouds = showMaternalWordCloud || showPediatricWordCloud;
 
   return (
     <div className="space-y-6">
@@ -197,42 +200,40 @@ export default function OverviewTab({
       </div>
 
       {/* Word Clouds */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm min-h-[360px] flex flex-col">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Maternal MeSH word cloud</h3>
-          {isLoadingWordCloud ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500">Generating word cloud...</p>
+      {showWordClouds && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {showMaternalWordCloud && (
+            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm min-h-[360px] flex flex-col">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Maternal MeSH word cloud</h3>
+              {isLoadingWordCloud ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-gray-500">Generating word cloud...</p>
+                </div>
+              ) : (
+                <div
+                  className="flex-1 min-h-0 h-full wordcloud-svg"
+                  dangerouslySetInnerHTML={{ __html: maternalSvg }}
+                />
+              )}
             </div>
-          ) : maternalSvg ? (
-            <div
-              className="flex-1 min-h-0 h-full wordcloud-svg"
-              dangerouslySetInnerHTML={{ __html: maternalSvg }}
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500">No terms available</p>
+          )}
+          {showPediatricWordCloud && (
+            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm min-h-[360px] flex flex-col">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Pediatric MeSH word cloud</h3>
+              {isLoadingWordCloud ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-gray-500">Generating word cloud...</p>
+                </div>
+              ) : (
+                <div
+                  className="flex-1 min-h-0 h-full wordcloud-svg"
+                  dangerouslySetInnerHTML={{ __html: pediatricSvg }}
+                />
+              )}
             </div>
           )}
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm min-h-[360px] flex flex-col">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Pediatric MeSH word cloud</h3>
-          {isLoadingWordCloud ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500">Generating word cloud...</p>
-            </div>
-          ) : pediatricSvg ? (
-            <div
-              className="flex-1 min-h-0 h-full wordcloud-svg"
-              dangerouslySetInnerHTML={{ __html: pediatricSvg }}
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500">No terms available</p>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
