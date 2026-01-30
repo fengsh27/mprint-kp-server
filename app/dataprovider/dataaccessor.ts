@@ -50,6 +50,18 @@ export const daGetWordClouds = (
   opts?: { signal?: AbortSignal }
 ) => api.post<unknown>("/api/word_clouds", { pmids, search_words: searchWords }, opts);
 
+export type AuthorNetworkOptions = {
+  maxNodes?: number;
+  maxEdges?: number;
+  minEdgeWeight?: number;
+};
+
+export const daGetAuthorNetwork = (
+  pmids: PmidRow[],
+  options?: AuthorNetworkOptions,
+  opts?: { signal?: AbortSignal }
+) => api.post<unknown>("/api/author_network", { pmids, ...options }, opts);
+
 export type StudyRequestOptions = {
   signal?: AbortSignal;
 };
