@@ -13,6 +13,12 @@ import { MAX_QUERIED_ARRAY_LENGTH } from "../../libs/constants";
 
 type AuthorNode = { id: string; size: number };
 type AuthorLink = { source: string; target: string; weight: number };
+type AuthorSummary = {
+  author: string;
+  paperCount: number;
+  pmids: string[];
+  affiliations: string[];
+};
 
 const DEFAULT_MAX_NODES = 200;
 const DEFAULT_MAX_EDGES = 3000;
@@ -77,6 +83,30 @@ function buildNetwork(
   }
 
   return { nodes, links };
+}
+
+function buildAuthorSummaries(rows: { pmid: string; author: string; affiliation?: string | null }[]): AuthorSummary[] {
+  const summaries = new Map<string, { pmids: Set<string>; affiliations: Set<string> }>();
+  for (const row of rows) {
+    const author = row.author?.trim();
+    if (!author) continue;
+    const entry = summaries.get(author) ?? { pmids: new Set<string>(), affiliations: new Set<string>() };
+    if (row.pmid) entry.pmids.add(String(row.pmid));
+    if (row.affiliation) {
+      const aff = String(row.affiliation).trim();
+      if (aff) entry.affiliations.add(aff);
+    }
+    summaries.set(author, entry);
+  }
+
+  return Array.from(summaries.entries())
+    .map(([author, info]) => ({
+      author,
+      paperCount: info.pmids.size,
+      pmids: Array.from(info.pmids),
+      affiliations: Array.from(info.affiliations)
+    }))
+    .sort((a, b) => b.paperCount - a.paperCount);
 }
 
 async function authorNetworkHandler(req: Request) {
@@ -158,6 +188,7 @@ async function authorNetworkHandler(req: Request) {
 
     const authorRows = await queriedAuthorRows(sanitizedPmids);
     const network = buildNetwork(authorRows, maxNodes, maxEdges, minEdgeWeight);
+    const authorSummaries = buildAuthorSummaries(authorRows);
 
     const requestEndTime = performance.now();
     const requestDurationMs = requestEndTime - requestStartTime;
@@ -169,7 +200,7 @@ async function authorNetworkHandler(req: Request) {
       requestDurationMs: Math.round(requestDurationMs * 100) / 100
     });
 
-    const response = NextResponse.json(network);
+    const response = NextResponse.json({ ...network, authors: authorSummaries });
     return addSecurityHeaders(response);
   } catch (error) {
     console.error("Error in author network API:", error);

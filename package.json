@@ -17,6 +17,8 @@
     "@types/react-virtualized": "^9.22.2",
     "better-sqlite3": "^12.4.6",
     "cytoscape": "^3.33.1",
+    "cytoscape-panzoom": "^2.5.3",
+    "jquery": "^4.0.0",
     "lucide-react": "^0.539.0",
     "mysql2": "^3.14.3",
     "next": "15.4.6",

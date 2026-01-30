@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { BarChart3 } from 'lucide-react';
 import Image from 'next/image';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -11,7 +12,14 @@ import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
 import PublicationTab from './PublicationTab';
 import DrugClassTab from './DrugClassTab';
-import AuthorNetworkTab from './AuthorNetworkTab';
+const AuthorNetworkTab = dynamic(() => import('./AuthorNetworkTab'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-32">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  )
+});
 
 import {
   daGetConcepts,

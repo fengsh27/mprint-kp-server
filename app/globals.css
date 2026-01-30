@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "cytoscape-panzoom/cytoscape.js-panzoom.css";
 
 :root {
   --background: #ffffff;
