@@ -529,7 +529,7 @@ export default function Home() {
 
     setIsLoadingAuthorNetwork(true);
     setAuthorNetworkError(null);
-    daGetAuthorNetwork(pmidData, { maxNodes: 200, maxEdges: 3000, minEdgeWeight: 1 }, { signal })
+    daGetAuthorNetwork(pmidData, { minEdgeWeight: 1 }, { signal })
       .then((data: any) => {
         if (!isActive) return;
         setAuthorNetworkData(data ?? null);

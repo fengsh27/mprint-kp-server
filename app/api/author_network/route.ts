@@ -20,8 +20,8 @@ type AuthorSummary = {
   affiliations: string[];
 };
 
-const DEFAULT_MAX_NODES = 200;
-const DEFAULT_MAX_EDGES = 3000;
+const DEFAULT_MAX_NODES = 50000;
+const DEFAULT_MAX_EDGES = 200000;
 const DEFAULT_MIN_EDGE_WEIGHT = 1;
 
 function clamp(value: number, min: number, max: number): number {
@@ -182,8 +182,8 @@ async function authorNetworkHandler(req: Request) {
     const pmids = items.map((item: any) => item.pmid);
     const sanitizedPmids = sanitizeInput(pmids);
 
-    const maxNodes = clamp(Number(body?.maxNodes ?? DEFAULT_MAX_NODES), 25, 500);
-    const maxEdges = clamp(Number(body?.maxEdges ?? DEFAULT_MAX_EDGES), 50, 10000);
+    const maxNodes = clamp(Number(body?.maxNodes ?? DEFAULT_MAX_NODES), 25, 50000);
+    const maxEdges = clamp(Number(body?.maxEdges ?? DEFAULT_MAX_EDGES), 50, 200000);
     const minEdgeWeight = clamp(Number(body?.minEdgeWeight ?? DEFAULT_MIN_EDGE_WEIGHT), 1, 50);
 
     const authorRows = await queriedAuthorRows(sanitizedPmids);

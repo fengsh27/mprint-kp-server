@@ -2,11 +2,8 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { ChevronDownIcon } from 'lucide-react';
-import * as Accordion from '@radix-ui/react-accordion';
-import 'react-data-grid/lib/styles.css';
-import { DataGrid } from 'react-data-grid';
 import cytoscape from 'cytoscape';
+import AuthorNetworkRightPanel from './AuthorNetworkRightPanel';
 
 const CytoscapeComponent = dynamic(() => import('react-cytoscapejs'), {
   ssr: false,
@@ -45,6 +42,7 @@ const DEFAULT_MIN_NODE_SIZE = 10;
 const DEFAULT_MAX_NODE_SIZE = 40;
 const DEFAULT_MIN_EDGE_WIDTH = 0.6;
 const DEFAULT_MAX_EDGE_WIDTH = 2.6;
+const GRAPH_NODE_LIMIT = 500;
 const NODE_COLORS = ['#4E79A7', '#59A14F', '#E15759', '#B07AA1', '#76B7B2', '#EDC948', '#F28E2B', '#FF9DA7', '#9C755F', '#BAB0AC'];
 
 const hashString = (value: string) => {
@@ -63,11 +61,11 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
   const [isCyReady, setIsCyReady] = useState(false);
   const [rightPanelExpanded, setRightPanelExpanded] = useState(true);
   const [panelWidth, setPanelWidth] = useState(420);
-  const resizeStartRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
   const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(null);
+  const [showAllAuthors, setShowAllAuthors] = useState(true);
   const panzoomReadyRef = useRef(false);
 
   const nodes = data?.nodes ?? [];
@@ -120,32 +118,64 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
     { key: 'affiliations', name: 'Affiliation', resizable: true, sortable: false }
   ], []);
 
+  const visibleAuthors = useMemo(() => {
+    if (showAllAuthors) return null;
+    return new Set(paginatedRows.map((row) => row.id));
+  }, [showAllAuthors, paginatedRows]);
+
+  const graphNodesBase = useMemo(() => {
+    if (!showAllAuthors) return nodes;
+    return nodes.slice(0, GRAPH_NODE_LIMIT);
+  }, [nodes, showAllAuthors]);
+
+  const graphNodeSet = useMemo(() => new Set(graphNodesBase.map((node) => node.id)), [graphNodesBase]);
+
+  const graphLinksBase = useMemo(() => {
+    if (!showAllAuthors) return links;
+    return links.filter((link) => graphNodeSet.has(link.source) && graphNodeSet.has(link.target));
+  }, [links, graphNodeSet, showAllAuthors]);
+
+  const visibleLinks = useMemo(() => {
+    if (showAllAuthors || !visibleAuthors) return graphLinksBase;
+    return graphLinksBase.filter((link) => visibleAuthors.has(link.source) || visibleAuthors.has(link.target));
+  }, [graphLinksBase, showAllAuthors, visibleAuthors]);
+
+  const visibleNodes = useMemo(() => {
+    if (showAllAuthors || !visibleAuthors) return graphNodesBase;
+    const nodeIds = new Set<string>(visibleAuthors);
+    visibleLinks.forEach((link) => {
+      nodeIds.add(link.source);
+      nodeIds.add(link.target);
+    });
+    return nodes.filter((node) => nodeIds.has(node.id));
+  }, [nodes, graphNodesBase, visibleAuthors, visibleLinks, showAllAuthors]);
+
   const nodeSizeStats = useMemo(() => {
     let min = Infinity;
     let max = 0;
-    nodes.forEach((node) => {
+    visibleNodes.forEach((node) => {
       min = Math.min(min, node.size);
       max = Math.max(max, node.size);
     });
     if (!Number.isFinite(min)) min = 0;
     if (!Number.isFinite(max)) max = 1;
     return { min, max };
-  }, [nodes]);
+  }, [visibleNodes]);
 
   const edgeWeightStats = useMemo(() => {
     let min = Infinity;
     let max = 0;
-    links.forEach((link) => {
+    visibleLinks.forEach((link) => {
       min = Math.min(min, link.weight);
       max = Math.max(max, link.weight);
     });
     if (!Number.isFinite(min)) min = 0;
     if (!Number.isFinite(max)) max = 1;
     return { min, max };
-  }, [links]);
+  }, [visibleLinks]);
 
   const elements = useMemo(() => {
-    const nodeElements = nodes.map((node) => ({
+    const nodeElements = visibleNodes.map((node) => ({
       data: {
         id: node.id,
         label: node.id,
@@ -155,7 +185,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       }
     }));
 
-    const edgeElements = links.map((link, index) => ({
+    const edgeElements = visibleLinks.map((link, index) => ({
       data: {
         id: `edge-${index}-${link.source}-${link.target}`,
         source: link.source,
@@ -165,9 +195,20 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
     }));
 
     return [...nodeElements, ...edgeElements];
-  }, [nodes, links]);
+  }, [visibleNodes, visibleLinks]);
 
   const layout = useMemo(() => {
+    if (!showAllAuthors && visibleAuthors) {
+      return {
+        name: 'concentric',
+        animate: false,
+        fit: false,
+        padding: 20,
+        concentric: (node: any) => (visibleAuthors.has(node.data('id')) ? 2 : 1),
+        levelWidth: () => 120 * spacing,
+        minNodeSpacing: 16 * spacing
+      } as const;
+    }
     return {
       name: 'concentric',
       animate: false,
@@ -177,7 +218,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       levelWidth: () => 50 * spacing,
       minNodeSpacing: 10 * spacing
     } as const;
-  }, [spacing]);
+  }, [spacing, showAllAuthors, visibleAuthors]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -380,37 +421,14 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
     cy.elements().unselect();
     node.select();
     const collaboratorCount = node.neighborhood('node').length;
-    cy.fit(node, 80);
+    cy.animate({ fit: { eles: node, padding: 250 } }, { duration: 600 });
     const pos = node.renderedPosition();
     setHoverInfo({
-      x: pos.x + 12,
-      y: pos.y + 12,
+      x: pos.x + 30,
+      y: pos.y + 30,
       content: `Author: ${node.data('label')}\nPapers: ${node.data('paperCount') ?? 0}\nCollaborators: ${collaboratorCount}`
     });
   };
-  /*
-  useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      if (!resizeStartRef.current) return;
-      const { startX, startWidth } = resizeStartRef.current;
-      const delta = startX - event.clientX;
-      const nextWidth = Math.min(640, Math.max(320, startWidth + delta));
-      setPanelWidth(nextWidth);
-    };
-    const handleMouseUp = () => {
-      resizeStartRef.current = null;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
-  */
-
   return (
     <div ref={containerRef} className="relative bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3 mb-3">
@@ -485,128 +503,29 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
             ]}
           />
         </div>
-        <div
-          className={`${rightPanelExpanded ? '' : 'w-14'} bg-gray-100 rounded-lg min-h-[560px] transition-all duration-300 ease-in-out relative overflow-visible ${rightPanelExpanded ? 'min-w-[320px]' : 'min-w-[56px]'}`}
-          style={rightPanelExpanded ? { width: panelWidth } : undefined}
-        >
-          {rightPanelExpanded && (
-            <div
-              className="absolute left-0 top-0 h-full w-2 cursor-col-resize bg-transparent hover:bg-blue-200/40 z-20"
-              onMouseDown={(event) => {
-                event.preventDefault();
-                document.body.style.cursor = 'col-resize';
-                document.body.style.userSelect = 'none';
-                resizeStartRef.current = { startX: event.clientX, startWidth: panelWidth };
-              }}
-            />
-          )}
-          <button
-            onClick={() => setRightPanelExpanded((prev) => !prev)}
-            className="absolute top-2 left-2 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors z-10 shadow-md"
-            title={rightPanelExpanded ? 'Collapse panel' : 'Expand panel'}
-          >
-            {rightPanelExpanded ? (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            )}
-          </button>
-          <div className={`${rightPanelExpanded ? 'p-2' : 'p-1'} mt-8`}>
-            {rightPanelExpanded ? (
-              <Accordion.Root type="multiple" defaultValue={["authors"]} className="space-y-4">
-                <Accordion.Item value="authors" className="bg-white rounded-lg shadow-sm">
-                  <Accordion.Trigger className="group flex items-center justify-between w-full p-3 text-left hover:bg-gray-50 transition-colors rounded-lg">
-                    <span className="font-medium text-gray-900">Authors</span>
-                    <ChevronDownIcon className="w-5 h-5 text-gray-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                  </Accordion.Trigger>
-                  <Accordion.Content className="px-3 pb-3">
-                    <div className="pt-2 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-600">Search</label>
-                        <input
-                          type="text"
-                          value={searchTerm}
-                          onChange={(event) => {
-                            setSearchTerm(event.target.value);
-                            setPage(1);
-                          }}
-                          placeholder="Author, PMID, affiliation"
-                          className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
-                          <label>Show</label>
-                          <select
-                            value={pageSize}
-                            onChange={(event) => {
-                              setPageSize(Number(event.target.value));
-                              setPage(1);
-                            }}
-                            className="border border-gray-300 rounded px-2 py-1 text-xs"
-                          >
-                            <option value={10}>10</option>
-                            <option value={25}>25</option>
-                            <option value={50}>50</option>
-                          </select>
-                          <label>rows</label>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {filteredRows.length} results
-                        </div>
-                      </div>
-                      <div className="h-[360px]">
-                        <DataGrid
-                          columns={gridColumns}
-                          rows={paginatedRows}
-                          className="rdg-light"
-                          rowKeyGetter={(row) => row.id}
-                          rowClass={(row) => (row.id === selectedAuthorId ? 'bg-blue-50' : '')}
-                          onCellClick={(args) => {
-                            setSelectedAuthorId(args.row.id);
-                            focusAuthorNode(args.row.author);
-                          }}
-                          defaultColumnOptions={{ resizable: true, sortable: true }}
-                          style={{ height: '100%' }}
-                          rowHeight={36}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-gray-600">
-                        <span>
-                          Page {currentPage} of {totalPages}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="px-2 py-1 border border-gray-300 rounded disabled:opacity-50"
-                            disabled={currentPage <= 1}
-                            onClick={() => setPage(Math.max(1, currentPage - 1))}
-                          >
-                            Prev
-                          </button>
-                          <button
-                            type="button"
-                            className="px-2 py-1 border border-gray-300 rounded disabled:opacity-50"
-                            disabled={currentPage >= totalPages}
-                            onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-                          >
-                            Next
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </Accordion.Content>
-                </Accordion.Item>
-              </Accordion.Root>
-            ) : (
-              <div className="flex items-center justify-center text-xs text-gray-400 h-[460px]">Authors</div>
-            )}
-          </div>
-        </div>
+        <AuthorNetworkRightPanel
+          rightPanelExpanded={rightPanelExpanded}
+          setRightPanelExpanded={setRightPanelExpanded}
+          panelWidth={panelWidth}
+          setPanelWidth={setPanelWidth}
+          showAllAuthors={showAllAuthors}
+          setShowAllAuthors={setShowAllAuthors}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          setPage={setPage}
+          filteredCount={filteredRows.length}
+          paginatedRows={paginatedRows}
+          gridColumns={gridColumns}
+          selectedAuthorId={selectedAuthorId}
+          onAuthorSelect={(author, id) => {
+            setSelectedAuthorId(id);
+            focusAuthorNode(author);
+          }}
+        />
       </div>
       {hoverInfo && (
         <div
