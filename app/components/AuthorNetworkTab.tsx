@@ -43,7 +43,21 @@ const DEFAULT_MAX_NODE_SIZE = 40;
 const DEFAULT_MIN_EDGE_WIDTH = 0.6;
 const DEFAULT_MAX_EDGE_WIDTH = 2.6;
 const GRAPH_NODE_LIMIT = 500;
-const NODE_COLORS = ['#4E79A7', '#59A14F', '#E15759', '#B07AA1', '#76B7B2', '#EDC948', '#F28E2B', '#FF9DA7', '#9C755F', '#BAB0AC'];
+const NODE_COLORS = [
+  '#4E79A7',
+  '#59A14F',
+  '#E15759',
+  '#B07AA1',
+  '#76B7B2',
+  '#EDC948',
+  '#F28E2B',
+  '#FF9DA7',
+  '#9C755F',
+  '#BAB0AC'
+];
+
+const FIT_PADDING = 10;
+
 
 const hashString = (value: string) => {
   let hash = 0;
@@ -53,6 +67,8 @@ const hashString = (value: string) => {
   return Math.abs(hash);
 };
 
+const renderNodeSize = (size: number) => Math.max(12, 8 + size * 14);
+
 export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetworkTabProps) {
   const spacing = 1.0;
   const cyRef = useRef<any>(null);
@@ -60,13 +76,34 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; content: string } | null>(null);
   const [isCyReady, setIsCyReady] = useState(false);
   const [rightPanelExpanded, setRightPanelExpanded] = useState(true);
-  const [panelWidth, setPanelWidth] = useState(420);
+  const panelWidth = 420;
   const [searchTerm, setSearchTerm] = useState('');
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
   const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(null);
   const [showAllAuthors, setShowAllAuthors] = useState(true);
+  const [layoutType, setLayoutType] = useState<'fcose' | 'circle' | 'concentric' | 'klay'>('fcose');
+  const [isKlayReady, setIsKlayReady] = useState(false);
+  const [isFcoseReady, setIsFcoseReady] = useState(false);
   const panzoomReadyRef = useRef(false);
+  const klayReadyRef = useRef(false);
+  const fitRafRef = useRef<number | null>(null);
+
+  const scheduleFit = React.useCallback((padding = FIT_PADDING) => {
+    if (!cyRef.current) return;
+    if (fitRafRef.current) {
+      cancelAnimationFrame(fitRafRef.current);
+    }
+    fitRafRef.current = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const cy = cyRef.current;
+        if (!cy) return;
+        cy.resize();
+        cy.fit(undefined, padding);
+      });
+    });
+  }, []);
+
 
   const nodes = data?.nodes ?? [];
   const links = data?.links ?? [];
@@ -102,20 +139,30 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
   }, [filteredRows, currentPage, pageSize]);
 
   const gridColumns = useMemo(() => [
-    { key: 'author', name: 'Author', resizable: true, sortable: true },
-    { key: 'paperCount', name: 'Paper Count', resizable: true, sortable: true },
+    { key: 'author', name: 'Author', sortable: true },
+    { key: 'paperCount', name: 'Paper Count', sortable: true },
     {
       key: 'pmids',
       name: 'PMIDs',
-      resizable: true,
       sortable: false,
+      width: 180,
       renderCell: ({ row }) => (
-        <div className="overflow-x-auto whitespace-nowrap max-w-full" title={row.pmids}>
+        <div className="truncate whitespace-nowrap max-w-full" title={row.pmids}>
           {row.pmids}
         </div>
       )
     },
-    { key: 'affiliations', name: 'Affiliation', resizable: true, sortable: false }
+    {
+      key: 'affiliations',
+      name: 'Affiliation',
+      sortable: false,
+      width: 200,
+      renderCell: ({ row }) => (
+        <div className="truncate whitespace-nowrap max-w-full" title={row.affiliations}>
+          {row.affiliations}
+        </div>
+      )
+    }
   ], []);
 
   const visibleAuthors = useMemo(() => {
@@ -198,14 +245,75 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
   }, [visibleNodes, visibleLinks]);
 
   const layout = useMemo(() => {
-    if (!showAllAuthors && visibleAuthors) {
+    if (layoutType === 'klay' && !isKlayReady) {
+      return {
+        name: 'cose',
+        animate: false,
+        fit: false,
+        padding: 20
+      } as const;
+    }
+    if (layoutType === 'fcose' && !isFcoseReady) {
+      return {
+        name: 'cose',
+        animate: false,
+        fit: false,
+        padding: 20
+      } as const;
+    }
+    if (layoutType === 'fcose') {
+      return {
+        name: 'fcose',
+        animate: false,
+        fit: false,
+        padding: 20,
+        nodeSeparation: 160,
+        idealEdgeLength: 220,
+        edgeElasticity: 0.1,
+        gravity: 0.001,
+        numIter: 3000,
+        randomize: true,
+        packComponents: true
+      } as const;
+    }
+    if (layoutType === 'circle') {
+      return {
+        name: 'circle',
+        animate: false,
+        fit: false,
+        padding: 20
+      } as const;
+    }
+    if (layoutType === 'klay') {
+      return {
+        name: 'klay',
+        animate: false,
+        fit: false,
+        padding: 20,
+        klay: {
+          direction: 'RIGHT',
+          spacing: 20,
+          edgeSpacingFactor: 0.2,
+          nodeLayering: 'INTERACTIVE'
+        }
+      } as const;
+    }
+    if (!showAllAuthors && visibleAuthors && layoutType === 'concentric') {
+      const hasNonPageNodes = visibleNodes.some((node) => !visibleAuthors.has(node.id));
       return {
         name: 'concentric',
         animate: false,
         fit: false,
         padding: 20,
-        concentric: (node: any) => (visibleAuthors.has(node.data('id')) ? 2 : 1),
-        levelWidth: () => 120 * spacing,
+        concentric: (nd: any) => {
+          const id = nd.data('id');
+          const level = hasNonPageNodes
+            ? (visibleAuthors.has(id) ? 100 : 0)
+            : (nd.data('size') ?? 1);
+          console.log(`[fengsh] current page mode level: ${level}`);
+          return level;
+        },
+        levelWidth: () => 50, // (hasNonPageNodes ? 120 : 60) * spacing,
         minNodeSpacing: 16 * spacing
       } as const;
     }
@@ -214,11 +322,17 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       animate: false,
       fit: false,
       padding: 20,
-      concentric: (node: any) => node.data('size') ?? 1,
-      levelWidth: () => 50 * spacing,
+      concentric: (nd: any) => {
+        const s = nd.data('size');
+        if (s >= 20) return 300;
+        if (s >= 10) return 200;
+        if (s >= 5) return 100;
+        return 0;
+      },
+      levelWidth: () => 50,
       minNodeSpacing: 10 * spacing
     } as const;
-  }, [spacing, showAllAuthors, visibleAuthors]);
+  }, [spacing, showAllAuthors, visibleAuthors, layoutType, isKlayReady, isFcoseReady, visibleNodes]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -234,6 +348,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
         if (cyRef.current?.panzoom && !cyRef.current.data('panzoom')) {
           cyRef.current.panzoom();
           cyRef.current.data('panzoom', true);
+          scheduleFit(FIT_PADDING);
         }
       })
       .catch(() => {
@@ -242,18 +357,76 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
     return () => {
       isMounted = false;
     };
+  }, [scheduleFit]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (klayReadyRef.current) return;
+    let isMounted = true;
+    import('cytoscape-klay')
+      .then((module) => {
+        if (!isMounted) return;
+        const register = (module as any).default ?? module;
+        cytoscape.use(register);
+        klayReadyRef.current = true;
+        setIsKlayReady(true);
+      })
+      .catch(() => {
+        // ignore klay init failures
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (isFcoseReady) return;
+    let isMounted = true;
+    import('cytoscape-fcose')
+      .then((module) => {
+        if (!isMounted) return;
+        const register = (module as any).default ?? module;
+        cytoscape.use(register);
+        setIsFcoseReady(true);
+      })
+      .catch(() => {
+        // ignore fcose init failures
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [isFcoseReady]);
 
   useEffect(() => {
     if (!cyRef.current) return;
     const cy = cyRef.current;
     cy.layout(layout).run();
     cy.once('layoutstop', () => {
-      cy.fit(undefined, 40);
+      scheduleFit(FIT_PADDING);
       cy.userZoomingEnabled(true);
       cy.userPanningEnabled(true);
     });
-  }, [layout]);
+  }, [layout, scheduleFit]);
+
+  useEffect(() => {
+    if (!isCyReady || !cyRef.current) return;
+    const cy = cyRef.current;
+    const container = cy.container?.();
+    if (!container) return;
+    const observer = new ResizeObserver(() => {
+      scheduleFit(FIT_PADDING);
+    });
+    observer.observe(container);
+    return () => {
+      observer.disconnect();
+    };
+  }, [isCyReady, scheduleFit]);
+
+  useEffect(() => {
+    scheduleFit(FIT_PADDING);
+  }, [rightPanelExpanded, scheduleFit]);
+
 
   useEffect(() => {
     if (!isCyReady || !cyRef.current) return;
@@ -297,7 +470,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       setHoverInfo({
         x: coords.x,
         y: coords.y,
-        content: `${edge.source().data('label')} ↔ ${edge.target().data('label')}\nCoauthored: ${edge.data('weight')}`
+        content: `Authors: ${edge.source().data('label')}; ${edge.target().data('label')}\nCoauthored: ${edge.data('weight')}`
       });
     };
     const clearHover = () => {
@@ -344,7 +517,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       setHoverInfo({
         x: coords.x,
         y: coords.y,
-        content: `${edge.source().data('label')} ↔ ${edge.target().data('label')}\nCoauthored: ${edge.data('weight')}`
+        content: `Authors: ${edge.source().data('label')}; ${edge.target().data('label')}\nCoauthored: ${edge.data('weight')}`
       });
     };
     cy.on('tap', 'edge', handleEdgeClick);
@@ -402,7 +575,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
 
   const handleFit = () => {
     if (!cyRef.current) return;
-    cyRef.current.fit(undefined, 40);
+    cyRef.current.fit(undefined, FIT_PADDING);
   };
 
   const handleReset = () => {
@@ -421,14 +594,40 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
     cy.elements().unselect();
     node.select();
     const collaboratorCount = node.neighborhood('node').length;
-    cy.animate({ fit: { eles: node, padding: 250 } }, { duration: 600 });
-    const pos = node.renderedPosition();
-    setHoverInfo({
-      x: pos.x + 30,
-      y: pos.y + 30,
-      content: `Author: ${node.data('label')}\nPapers: ${node.data('paperCount') ?? 0}\nCollaborators: ${collaboratorCount}`
-    });
+    const setTooltipForNode = () => {
+      const pos = node.renderedPosition();
+      if (!containerRef.current || !cy.container) {
+        setHoverInfo({
+          x: pos.x + 30,
+          y: pos.y + 30,
+          content: `Author: ${node.data('label')}\nPapers: ${node.data('paperCount') ?? 0}\nCollaborators: ${collaboratorCount}`
+        });
+        return;
+      }
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const cyRect = cy.container().getBoundingClientRect();
+      const offsetX = cyRect.left - containerRect.left;
+      const offsetY = cyRect.top - containerRect.top;
+      const maxWidth = 260;
+      const maxHeight = 110;
+      let x = offsetX + pos.x + 12;
+      let y = offsetY + pos.y + 12;
+      x = Math.max(8, Math.min(x, containerRect.width - maxWidth));
+      y = Math.max(8, Math.min(y, containerRect.height - maxHeight));
+      setHoverInfo({
+        x,
+        y,
+        content: `Author: ${node.data('label')}\nPapers: ${node.data('paperCount') ?? 0}\nCollaborators: ${collaboratorCount}`
+      });
+    };
+
+    // During animated fit, renderedPosition changes over time; set tooltip after animation completes.
+    cy.animate(
+      { fit: { eles: node, padding: 250 } },
+      { duration: 600, complete: setTooltipForNode }
+    );
   };
+
   return (
     <div ref={containerRef} className="relative bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3 mb-3">
@@ -447,6 +646,37 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
           >
             Reset
           </button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-600">Layout</span>
+            <select
+              value={layoutType}
+              onChange={(event) => setLayoutType(event.target.value as 'fcose' | 'circle' | 'concentric' | 'klay')}
+              className="border border-gray-300 rounded px-2 py-1 text-xs bg-white"
+            >
+              <option value="fcose" disabled={!isFcoseReady}>Force-directed</option>
+              <option value="circle">Circle</option>
+              <option value="concentric">Concentric</option>
+              <option value="klay" disabled={!isKlayReady}>Klay</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-600">Current</span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={showAllAuthors}
+                onChange={(event) => setShowAllAuthors(event.target.checked)}
+                aria-label="Toggle author scope"
+              />
+              <div className="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 transition-colors"></div>
+              <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
+            </label>
+            <span className="text-xs text-gray-600">All</span>
+          </div>
+        </div>
+        <div className="text-xs text-gray-500">
+          Nodes: {visibleNodes.length} · Edges: {visibleLinks.length}
         </div>
       </div>
 
@@ -455,14 +685,17 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
           <CytoscapeComponent
             elements={elements}
             layout={layout}
-            style={{ width: '100%', height: '520px' }}
+            style={{ width: '100%', height: '100%' }}
             cy={(cy) => {
               cyRef.current = cy;
               if (panzoomReadyRef.current && cy.panzoom && !cy.data('panzoom')) {
                 cy.panzoom();
                 cy.data('panzoom', true);
               }
-              if (!isCyReady) setIsCyReady(true);
+              if (!isCyReady) {
+                setIsCyReady(true);
+                scheduleFit(FIT_PADDING);
+              }
             }}
             wheelSensitivity={0.6}
             stylesheet={[
@@ -507,9 +740,6 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
           rightPanelExpanded={rightPanelExpanded}
           setRightPanelExpanded={setRightPanelExpanded}
           panelWidth={panelWidth}
-          setPanelWidth={setPanelWidth}
-          showAllAuthors={showAllAuthors}
-          setShowAllAuthors={setShowAllAuthors}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           pageSize={pageSize}
