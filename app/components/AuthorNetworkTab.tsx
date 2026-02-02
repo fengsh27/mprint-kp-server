@@ -147,7 +147,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       name: 'PMIDs',
       sortable: false,
       width: 180,
-      renderCell: ({ row }) => (
+      renderCell: ({ row }: { row: any }) => (
         <div className="truncate whitespace-nowrap max-w-full" title={row.pmids}>
           {row.pmids}
         </div>
@@ -368,7 +368,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       .then((module) => {
         if (!isMounted) return;
         const register = (module as any).default ?? module;
-        cytoscape.use(register);
+        (cytoscape as any).use(register);
         klayReadyRef.current = true;
         setIsKlayReady(true);
       })
@@ -388,7 +388,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       .then((module) => {
         if (!isMounted) return;
         const register = (module as any).default ?? module;
-        cytoscape.use(register);
+        (cytoscape as any).use(register);
         setIsFcoseReady(true);
       })
       .catch(() => {
@@ -692,9 +692,10 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
             style={{ width: '100%', height: '100%' }}
             cy={(cy) => {
               cyRef.current = cy;
-              if (panzoomReadyRef.current && cy.panzoom && !cy.data('panzoom')) {
-                cy.panzoom();
-                cy.data('panzoom', true);
+              const cyAny = cy as any;
+              if (panzoomReadyRef.current && cyAny.panzoom && !cyAny.data?.('panzoom')) {
+                cyAny.panzoom();
+                cyAny.data?.('panzoom', true);
               }
               if (!isCyReady) {
                 setIsCyReady(true);
