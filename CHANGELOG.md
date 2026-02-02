@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.20](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.19...v0.1.20) (2026-02-02)
+
+
+### Features
+
+* Implement author network ([#13](https://github.com/fengsh27/mprint-kp-server/issues/13)) ([6e0ed90](https://github.com/fengsh27/mprint-kp-server/commit/6e0ed90a11c5ef130d65393a0db3c1e49f4ca06b))
+
 ### [0.1.19](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.18...v0.1.19) (2026-01-12)
 
 ### [0.1.18](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.17...v0.1.18) (2026-01-11)
