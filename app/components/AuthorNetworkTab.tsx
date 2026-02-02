@@ -74,6 +74,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
   const cyRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; content: string } | null>(null);
+  const [pinnedInfo, setPinnedInfo] = useState<{ x: number; y: number; content: string } | null>(null);
   const [isCyReady, setIsCyReady] = useState(false);
   const [rightPanelExpanded, setRightPanelExpanded] = useState(true);
   const panelWidth = 420;
@@ -478,8 +479,10 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       setHoverInfo(null);
     };
     cy.on('mouseenter', 'node', showNodeHover);
+    cy.on("mouseenter", "node", () => console.log("node hover"));
     cy.on('mouseenter', 'edge', showEdgeHover);
     cy.on('mouseleave', 'node', clearHover);
+    cy.on("mouseleave", "node", () => console.log("node leave"));
     cy.on('mouseleave', 'edge', clearHover);
     return () => {
       cy.off('mouseenter', 'node', showNodeHover);
@@ -514,7 +517,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       edge.select();
       const pos = edge.renderedMidpoint ? edge.renderedMidpoint() : edge.source().renderedPosition();
       const coords = getTooltipPosition(pos);
-      setHoverInfo({
+      setPinnedInfo({
         x: coords.x,
         y: coords.y,
         content: `Authors: ${edge.source().data('label')}; ${edge.target().data('label')}\nCoauthored: ${edge.data('weight')}`
@@ -528,7 +531,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       const collaboratorCount = node.neighborhood('node').length;
       const pos = node.renderedPosition();
       const coords = getTooltipPosition(pos);
-      setHoverInfo({
+      setPinnedInfo({
         x: coords.x,
         y: coords.y,
         content: `Author: ${node.data('label')}\nPapers: ${node.data('paperCount') ?? 0}\nCollaborators: ${collaboratorCount}`
@@ -538,6 +541,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       if (event.target === cy) {
         cy.elements().unselect();
         setHoverInfo(null);
+        setPinnedInfo(null);
       }
     };
     cy.on('tap', 'node', handleNodeClick);
@@ -614,7 +618,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       let y = offsetY + pos.y + 12;
       x = Math.max(8, Math.min(x, containerRect.width - maxWidth));
       y = Math.max(8, Math.min(y, containerRect.height - maxHeight));
-      setHoverInfo({
+      setPinnedInfo({
         x,
         y,
         content: `Author: ${node.data('label')}\nPapers: ${node.data('paperCount') ?? 0}\nCollaborators: ${collaboratorCount}`
@@ -660,7 +664,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-600">Current</span>
+            <span className="text-xs text-gray-600">Current Page</span>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
@@ -672,7 +676,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
               <div className="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 transition-colors"></div>
               <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
             </label>
-            <span className="text-xs text-gray-600">All</span>
+            <span className="text-xs text-gray-600">All Authors</span>
           </div>
         </div>
         <div className="text-xs text-gray-500">
@@ -757,12 +761,12 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
           }}
         />
       </div>
-      {hoverInfo && (
+      {(hoverInfo ?? pinnedInfo) && (
         <div
           className="absolute z-10 max-w-xs whitespace-pre-line rounded-md border border-gray-200 bg-white/95 px-3 py-2 text-sm text-gray-700 shadow-lg"
-          style={{ left: hoverInfo.x, top: hoverInfo.y }}
+          style={{ left: (hoverInfo ?? pinnedInfo)!.x, top: (hoverInfo ?? pinnedInfo)!.y }}
         >
-          {hoverInfo.content}
+          {(hoverInfo ?? pinnedInfo)!.content}
         </div>
       )}
     </div>
