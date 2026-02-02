@@ -18,6 +18,23 @@ export interface PmidRow {
   pmid: string;
 }
 
+export type AuthorRow = {
+  pmid: string;
+  author: string;
+  affiliation: string | null;
+};
+
+export type AuthorNetworkNode = {
+  id: string;
+  size: number;
+};
+
+export type AuthorNetworkLink = {
+  source: string;
+  target: string;
+  weight: number;
+};
+
 export interface QueriedPmidInput {
   conceptIds: ConceptRow[];
   searchType: SearchType;

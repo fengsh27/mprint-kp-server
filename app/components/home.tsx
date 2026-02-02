@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { BarChart3 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { BarChart3, BookOpen, Network, Pill } from 'lucide-react';
 import Image from 'next/image';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useQueryState } from 'nuqs';
@@ -11,6 +12,14 @@ import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
 import PublicationTab from './PublicationTab';
 import DrugClassTab from './DrugClassTab';
+const AuthorNetworkTab = dynamic(() => import('./AuthorNetworkTab'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-32">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  )
+});
 
 import {
   daGetConcepts,
@@ -23,6 +32,7 @@ import {
   daGetDrugClassList,
   daGetDrugClassListByLevel,
   daExportStudy,
+  daGetAuthorNetwork,
 } from "../dataprovider/dataaccessor";
 import {
   ConceptRow,
@@ -219,6 +229,9 @@ export default function Home() {
   const [maternalWordCloudSvg, setMaternalWordCloudSvg] = useState("");
   const [pediatricWordCloudSvg, setPediatricWordCloudSvg] = useState("");
   const [isLoadingWordCloud, setIsLoadingWordCloud] = useState(false);
+  const [authorNetworkData, setAuthorNetworkData] = useState<any | null>(null);
+  const [isLoadingAuthorNetwork, setIsLoadingAuthorNetwork] = useState(false);
+  const [authorNetworkError, setAuthorNetworkError] = useState<string | null>(null);
   const hasActiveQuery = Boolean(
     queryDrug?.trim() ||
     queryDisease?.trim() ||
@@ -492,6 +505,49 @@ export default function Home() {
     };
   }, [pmidData, pmidKey, selectedDrug, selectedDisease]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+    let isActive = true;
+
+    if (activeTab !== 'author-network') {
+      return () => {
+        isActive = false;
+        controller.abort();
+      };
+    }
+
+    if (!pmidData || pmidData.length === 0 || !pmidKey) {
+      setAuthorNetworkData(null);
+      setAuthorNetworkError(null);
+      setIsLoadingAuthorNetwork(false);
+      return () => {
+        isActive = false;
+        controller.abort();
+      };
+    }
+
+    setIsLoadingAuthorNetwork(true);
+    setAuthorNetworkError(null);
+    daGetAuthorNetwork(pmidData, { minEdgeWeight: 1 }, { signal })
+      .then((data: any) => {
+        if (!isActive) return;
+        setAuthorNetworkData(data ?? null);
+        setIsLoadingAuthorNetwork(false);
+      })
+      .catch((error: any) => {
+        if (!isActive || error?.name === "AbortError") return;
+        console.error("Error fetching author network:", error);
+        setAuthorNetworkError("Failed to load author network");
+        setIsLoadingAuthorNetwork(false);
+      });
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [pmidData, pmidKey, activeTab]);
+
   function handleTabChange(value: string) {
     setIsTabSwitching(true);
     setActiveTab(value);
@@ -725,7 +781,7 @@ export default function Home() {
         />
 
         {/* Main Content */}
-        <div className="flex-1 bg-white p-10">
+        <div className="flex-1 min-w-0 bg-white p-10">
           {/* Tabs */}
           <Tabs.Root
             value={activeTab}
@@ -760,7 +816,7 @@ export default function Home() {
                   value="drug"
                   className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
-                  <BarChart3 className="w-4 h-4" />
+                  <Pill className="w-4 h-4" />
                   <span>Drug</span>
                 </Tabs.Trigger>
               )}
@@ -770,8 +826,18 @@ export default function Home() {
                   value="publication"
                   className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
-                  <BarChart3 className="w-4 h-4" />
+                  <BookOpen className="w-4 h-4" />
                   <span>Publication</span>
+                </Tabs.Trigger>
+              )}
+
+              {pmidData.length > 0 && (
+                <Tabs.Trigger
+                  value="author-network"
+                  className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  <Network className="w-4 h-4" />
+                  <span>Author Network</span>
                 </Tabs.Trigger>
               )}
 
@@ -845,6 +911,25 @@ export default function Home() {
                     publicationCount={publicationCount}
                     estimatedCount={pmidData.length}
                     isLoading={isLoadingPublications}
+                  />
+                )}
+              </Tabs.Content>
+            )}
+
+            {pmidData.length > 0 && (
+              <Tabs.Content
+                value="author-network"
+                className="outline-none animate-in fade-in-0 slide-in-from-right-1 duration-300"
+              >
+                {isTabSwitching && activeTab !== 'author-network' ? (
+                  <div className="flex items-center justify-center h-32">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : (
+                  <AuthorNetworkTab
+                    data={authorNetworkData}
+                    isLoading={isLoadingAuthorNetwork}
+                    error={authorNetworkError}
                   />
                 )}
               </Tabs.Content>

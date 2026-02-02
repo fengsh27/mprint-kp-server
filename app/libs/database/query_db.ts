@@ -9,6 +9,7 @@ import {
   PmidRow,
   SearchType,
   StudyResult,
+  AuthorRow,
 } from "./types";
 import { timeQuery, timeBatchedQuery } from "./query_timer";
 
@@ -372,6 +373,47 @@ export const queriedMeshTermRows = async (pmids: string[]) => {
   }
 
   return { maternal, pediatric };
+};
+
+export const queriedAuthorRows = async (pmids: string[]): Promise<AuthorRow[]> => {
+  if (!pmids || pmids.length === 0) {
+    return [];
+  }
+
+  const batchSize = 1000;
+  const totalBatches = Math.ceil(pmids.length / batchSize);
+  const rows: AuthorRow[] = [];
+
+  const TABLE_NAME = "pubmed_author_affiliation";
+  for (let i = 0; i < pmids.length; i += batchSize) {
+    const batch = pmids.slice(i, i + batchSize);
+    const batchNumber = Math.floor(i / batchSize) + 1;
+    const sql = `
+      SELECT PMID AS pmid, author, affiliation
+      FROM ${TABLE_NAME}
+      WHERE PMID IN (${placeholders(batch.length)})
+    `;
+
+    const batchRows = await timeBatchedQuery(
+      'queriedAuthorRows',
+      async () => {
+        const [result] = await pool.execute(sql, batch);
+        return (result as any[]).map((row) => ({
+          pmid: String(row.pmid),
+          author: row.author ? String(row.author) : "",
+          affiliation: row.affiliation ? String(row.affiliation) : null
+        }));
+      },
+      batchNumber,
+      totalBatches,
+      batch.length,
+      { totalPmidCount: pmids.length }
+    );
+
+    rows.push(...batchRows);
+  }
+
+  return rows;
 };
 
 export async function queriedStudyCount(pmidList: string[]): Promise<number> {
