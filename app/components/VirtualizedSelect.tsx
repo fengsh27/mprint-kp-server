@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { List } from 'react-virtualized';
 import { ChevronDownIcon } from 'lucide-react';
 
@@ -30,9 +30,16 @@ export default function VirtualizedSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredOptions, setFilteredOptions] = useState(options);
+  const [activeIndex, setActiveIndex] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<List>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const reactId = useId();
+  const listboxId = `vsel-listbox-${reactId}`;
+  const getOptionId = (index: number) => `${listboxId}-option-${index}`;
 
   // Filter options based on search term
   useEffect(() => {
@@ -108,10 +115,99 @@ export default function VirtualizedSelect({
     }
   }, [isOpen, value, searchTerm, filteredOptions, itemHeight]);
 
-  const handleSelect = (optionValue: string) => {
-    onValueChange(optionValue);
+  // Reset active index when filtered list changes, clamping to a valid row
+  useEffect(() => {
+    setActiveIndex((prev) => {
+      if (filteredOptions.length === 0) return 0;
+      if (prev >= filteredOptions.length) return filteredOptions.length - 1;
+      if (prev < 0) return 0;
+      return prev;
+    });
+  }, [filteredOptions]);
+
+  // When the dropdown opens, start the active index on the currently-selected
+  // option (if any) so arrow keys move relative to it
+  useEffect(() => {
+    if (isOpen) {
+      const selectedIdx = filteredOptions.findIndex((o) => o.value === value);
+      setActiveIndex(selectedIdx >= 0 ? selectedIdx : 0);
+    }
+  }, [isOpen]);
+
+  // Keep the active row visible and force row re-render so the highlight moves
+  useEffect(() => {
+    if (isOpen && listRef.current && filteredOptions.length > 0) {
+      listRef.current.scrollToRow(activeIndex);
+      listRef.current.forceUpdateGrid();
+    }
+  }, [activeIndex, isOpen, filteredOptions.length]);
+
+  const closeDropdown = (returnFocus: boolean) => {
     setIsOpen(false);
     setSearchTerm('');
+    if (returnFocus) {
+      // Defer so React finishes unmounting the popup before moving focus
+      setTimeout(() => triggerRef.current?.focus(), 0);
+    }
+  };
+
+  const handleSelect = (optionValue: string) => {
+    onValueChange(optionValue);
+    closeDropdown(true);
+  };
+
+  const handleTriggerKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+      if (!isOpen) {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+    } else if (e.key === 'Escape' && isOpen) {
+      e.preventDefault();
+      setIsOpen(false);
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        if (filteredOptions.length > 0) {
+          setActiveIndex((i) => Math.min(i + 1, filteredOptions.length - 1));
+        }
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (filteredOptions.length > 0) {
+          setActiveIndex((i) => Math.max(i - 1, 0));
+        }
+        break;
+      case 'Home':
+        e.preventDefault();
+        setActiveIndex(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        if (filteredOptions.length > 0) {
+          setActiveIndex(filteredOptions.length - 1);
+        }
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (filteredOptions[activeIndex]) {
+          handleSelect(filteredOptions[activeIndex].value);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        closeDropdown(true);
+        break;
+      case 'Tab':
+        // Let focus leave naturally, but close the popup
+        setIsOpen(false);
+        setSearchTerm('');
+        break;
+    }
   };
 
   const selectedOption = options.find(option => option.value === value);
@@ -122,17 +218,24 @@ export default function VirtualizedSelect({
     if (!option) return null;
 
     const isSelected = option.value === value;
+    const isActive = index === activeIndex;
 
     return (
       <div
         key={key}
+        id={getOptionId(index)}
+        role="option"
+        aria-selected={isSelected}
         style={style}
         className={`px-3 py-2 text-sm cursor-pointer border-b border-gray-100 ${
-          isSelected 
-            ? 'bg-blue-100 text-blue-900 font-medium' 
-            : 'text-gray-700 hover:bg-blue-50'
-        }`}
+          isSelected
+            ? 'bg-blue-100 text-blue-900 font-medium'
+            : isActive
+              ? 'bg-blue-50 text-gray-900'
+              : 'text-gray-700 hover:bg-blue-50'
+        } ${isActive ? 'ring-2 ring-inset ring-blue-400' : ''}`}
         onClick={() => handleSelect(option.value)}
+        onMouseEnter={() => setActiveIndex(index)}
       >
         {option.description ? (
           <div className="w-full flex flex-col">
@@ -156,8 +259,15 @@ export default function VirtualizedSelect({
     <div className="relative" ref={dropdownRef} style={{ width, maxWidth }}>
       {/* Trigger Button */}
       <button
+        ref={triggerRef}
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white flex items-center justify-between"
+        onKeyDown={handleTriggerKeyDown}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={listboxId}
+        aria-label={selectedOption ? `${placeholder}: ${selectedOption.label}` : placeholder}
+        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white flex items-center justify-between"
       >
         <span className={`${selectedOption ? "text-gray-900" : "text-gray-500"} truncate flex-1 text-left`} title={selectedOption ? selectedOption.label : placeholder}>
           {selectedOption ? selectedOption.label : placeholder}
@@ -171,17 +281,28 @@ export default function VirtualizedSelect({
           {/* Search Input */}
           <div className="p-2 border-b border-gray-200 sticky top-0 bg-white">
             <input
+              ref={searchInputRef}
               type="text"
+              role="combobox"
+              aria-expanded="true"
+              aria-controls={listboxId}
+              aria-autocomplete="list"
+              aria-activedescendant={
+                filteredOptions.length > 0 ? getOptionId(activeIndex) : undefined
+              }
               placeholder={searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              onKeyDown={handleSearchKeyDown}
+              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
             />
           </div>
 
-          {/* Select Option */}
-          <div 
+          {/* Clear Selection */}
+          <div
+            role="button"
+            tabIndex={-1}
             className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer border-b border-gray-200"
             onClick={() => handleSelect("")}
           >
@@ -190,7 +311,13 @@ export default function VirtualizedSelect({
 
           {/* Virtualized List */}
           {filteredOptions.length > 0 && (
-            <div ref={listContainerRef} style={{ width: width === "100%" ? "100%" : width }}>
+            <div
+              ref={listContainerRef}
+              role="listbox"
+              id={listboxId}
+              aria-label={placeholder}
+              style={{ width: width === "100%" ? "100%" : width }}
+            >
               <List
                 ref={listRef}
                 height={Math.min(maxHeight, filteredOptions.length * itemHeight)}
@@ -199,6 +326,7 @@ export default function VirtualizedSelect({
                 maxWidth={300}
                 width={210}
                 rowRenderer={rowRenderer}
+                scrollToAlignment="auto"
                 className="scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
               />
             </div>
