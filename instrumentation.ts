@@ -1,4 +1,7 @@
 export async function register() {
+  // process.on is Node.js-only — not available in the Edge Runtime that runs middleware.
+  if (process.env.NEXT_RUNTIME !== 'nodejs') return;
+
   // Prevent socket-write races (e.g. ERR_HTTP_HEADERS_SENT on client disconnect)
   // from taking down the entire Next.js standalone process.
   process.on('uncaughtException', (err: Error) => {

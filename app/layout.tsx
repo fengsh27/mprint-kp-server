@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { NuqsAdapter } from 'nuqs/adapters/next/app'
 import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,11 +22,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Reading headers() forces per-request dynamic rendering so Next.js stamps
+  // the nonce (set by middleware via x-nonce) onto its inline hydration scripts.
+  await headers();
+
   return (
     <html lang="en">
       <body

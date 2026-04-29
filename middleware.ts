@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomBytes } from "crypto";
 
 export function middleware(request: NextRequest) {
-  const nonce = randomBytes(16).toString("base64");
+  // crypto.getRandomValues is the Web Crypto API — available in the Edge Runtime,
+  // unlike Node.js's randomBytes which is not.
+  const array = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = btoa(String.fromCharCode(...array));
+
+  const isDev = process.env.NODE_ENV === 'development';
 
   const csp = [
     "default-src 'self'",
     // Nonce allows Next.js inline hydration scripts; blocks everything else inline
-    `script-src 'self' 'nonce-${nonce}'`,
+    // unsafe-eval is needed in dev because webpack uses eval() for source maps
+    `script-src 'self' 'nonce-${nonce}'${isDev ? " 'unsafe-eval'" : ''}`,
     // Tailwind generates inline styles at runtime
     "style-src 'self' 'unsafe-inline'",
     // next/font serves fonts from /_next/static/media (same origin); SVG word clouds use data URIs
