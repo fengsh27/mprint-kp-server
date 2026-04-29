@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import pool from "../../libs/database/silverdb";
+import appPool from "../../libs/database/appdb";
 import { queriedMeshTermRows } from "../../libs/database/query_db";
 import { withRateLimit, searchRateLimiter } from "../../libs/middleware/rateLimiter";
 import {
@@ -61,7 +61,7 @@ const buildCsv = (rows: MeshRow[]) => {
 };
 
 async function ensureCacheTable() {
-  await pool.execute(`
+  await appPool.execute(`
     CREATE TABLE IF NOT EXISTS cache_word_cloud (
       cache_key VARCHAR(255) PRIMARY KEY,
       svg LONGTEXT,
@@ -71,7 +71,7 @@ async function ensureCacheTable() {
 }
 
 async function fetchCachedSvg(cacheKey: string) {
-  const [rows] = await pool.execute(
+  const [rows] = await appPool.execute(
     "SELECT svg FROM cache_word_cloud WHERE cache_key = ?",
     [cacheKey]
   );
@@ -79,7 +79,7 @@ async function fetchCachedSvg(cacheKey: string) {
 }
 
 async function storeCachedSvg(cacheKey: string, svg: string) {
-  await pool.execute(
+  await appPool.execute(
     `
     INSERT INTO cache_word_cloud (cache_key, svg)
     VALUES (?, ?)
