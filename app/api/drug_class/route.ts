@@ -27,15 +27,25 @@ export async function GET(req: NextRequest) {
 
     const searchParams = req.nextUrl.searchParams;
     const heatmapType = searchParams.get('type') || 'drugs'; // 'drugs', 'level1', 'level2', 'level3'
-    const population = searchParams.get('population'); // 'pregnancy', 'postpartum', 'ped01', 'ped112', 'ped1218'
+    const population = searchParams.get('population');
     const drugClass = searchParams.get('drugClass'); // Filter drugs by specific drug class
+
+    const VALID_HEATMAP_TYPES = new Set(['drugs', 'level1', 'level2', 'level3']);
+    const VALID_POPULATIONS = new Set(['pregnancy', 'postpartum', 'ped01', 'ped112', 'ped1218']);
+
+    if (!VALID_HEATMAP_TYPES.has(heatmapType)) {
+      return NextResponse.json({ error: 'Invalid type parameter' }, { status: 400 });
+    }
+    if (population && !VALID_POPULATIONS.has(population)) {
+      return NextResponse.json({ error: 'Invalid population parameter' }, { status: 400 });
+    }
 
     const db = new Database(DB_PATH, { readonly: true });
 
     try {
       // Get all populations if not specified
-      const populations = population 
-        ? [population] 
+      const populations = population
+        ? [population]
         : ['pregnancy', 'postpartum', 'ped01', 'ped112', 'ped1218'];
 
       const result: Record<string, any> = {};
