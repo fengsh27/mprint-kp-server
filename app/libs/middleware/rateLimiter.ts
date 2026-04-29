@@ -175,12 +175,23 @@ export function withRateLimit(
     }
 
     // Add rate limit headers to successful responses
-    const response = await handler(req);
-    Object.entries(limiter.getHeaders(rateLimit.remaining, rateLimit.resetTime))
-      .forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-    
+    let response: NextResponse;
+    try {
+      response = await handler(req);
+    } catch (err) {
+      console.error('Route handler threw unexpectedly:', err);
+      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+
+    try {
+      Object.entries(limiter.getHeaders(rateLimit.remaining, rateLimit.resetTime))
+        .forEach(([key, value]) => {
+          response.headers.set(key, value);
+        });
+    } catch {
+      // Socket already closed or headers committed — rate-limit headers are informational only.
+    }
+
     return response;
   };
 }

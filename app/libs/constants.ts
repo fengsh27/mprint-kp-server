@@ -1,1 +1,3 @@
 export const MAX_QUERIED_ARRAY_LENGTH = 50000;
+export const MAX_SEARCH_WORDS = 50;
+export const MAX_SEARCH_WORD_LENGTH = 100;
