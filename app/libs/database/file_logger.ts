@@ -10,17 +10,17 @@ const LOGS_DIR = process.env.QUERY_LOGS_DIR || join(process.cwd(), 'logs');
 const ENABLE_FILE_LOGGING = process.env.ENABLE_QUERY_FILE_LOGGING !== 'false'; // Default to true
 
 // Ensure logs directory exists
-let logsDirInitialized = false;
+let logsDirReady = false;
+let logsDirFailed = false;
 
 async function ensureLogsDirectory(): Promise<void> {
-  if (logsDirInitialized) return;
-  
+  if (logsDirReady || logsDirFailed) return;
   try {
     await fs.mkdir(LOGS_DIR, { recursive: true });
-    logsDirInitialized = true;
+    logsDirReady = true;
   } catch (error) {
+    logsDirFailed = true;
     console.error('[FILE_LOGGER] Failed to create logs directory:', error);
-    // Continue anyway - will fail on write attempt
   }
 }
 
@@ -43,15 +43,10 @@ export async function writeLogToFile(logData: any): Promise<void> {
 
   try {
     await ensureLogsDirectory();
-    
+    if (logsDirFailed) return;
     const logFilePath = getLogFilePath();
-    const logLine = JSON.stringify(logData) + '\n';
-    
-    // Append to file (creates file if it doesn't exist)
-    await fs.appendFile(logFilePath, logLine, 'utf8');
+    await fs.appendFile(logFilePath, JSON.stringify(logData) + '\n', 'utf8');
   } catch (error) {
-    // Don't throw - logging failures shouldn't break the application
-    // Just log to console as fallback
     console.error('[FILE_LOGGER] Failed to write log to file:', error);
   }
 }
@@ -66,11 +61,9 @@ export async function writeLogsToFile(logDataArray: any[]): Promise<void> {
 
   try {
     await ensureLogsDirectory();
-    
+    if (logsDirFailed) return;
     const logFilePath = getLogFilePath();
-    const logLines = logDataArray.map(data => JSON.stringify(data)).join('\n') + '\n';
-    
-    await fs.appendFile(logFilePath, logLines, 'utf8');
+    await fs.appendFile(logFilePath, logDataArray.map(d => JSON.stringify(d)).join('\n') + '\n', 'utf8');
   } catch (error) {
     console.error('[FILE_LOGGER] Failed to write logs to file:', error);
   }
