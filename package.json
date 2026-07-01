@@ -24,7 +24,7 @@
     "jquery": "^4.0.0",
     "lucide-react": "^0.539.0",
     "mysql2": "^3.14.3",
-    "next": "15.4.6",
+    "next": "^15.5.15",
     "nuqs": "^2.5.1",
     "plotly.js": "^3.1.0",
     "plotly.js-dist": "^3.1.0",

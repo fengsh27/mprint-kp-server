@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import pool from "../../libs/database/silverdb";
+import appPool from "../../libs/database/appdb";
 import { queriedMeshTermRows } from "../../libs/database/query_db";
 import { withRateLimit, searchRateLimiter } from "../../libs/middleware/rateLimiter";
 import {
@@ -15,9 +15,13 @@ import {
   sanitizeInput,
   logSecurityEvent
 } from "../../libs/middleware/security";
-import { MAX_QUERIED_ARRAY_LENGTH } from "../../libs/constants";
+import { MAX_QUERIED_ARRAY_LENGTH, MAX_SEARCH_WORDS, MAX_SEARCH_WORD_LENGTH } from "../../libs/constants";
 
 const execFileAsync = promisify(execFile);
+
+// Only allow letters, numbers, spaces, hyphens, and underscores — no shell metacharacters.
+const SAFE_SEARCH_WORD_RE = /^[a-zA-Z0-9\s\-_]+$/;
+
 const THEMES = [
   "blue",
   "dark_blue",
@@ -57,7 +61,7 @@ const buildCsv = (rows: MeshRow[]) => {
 };
 
 async function ensureCacheTable() {
-  await pool.execute(`
+  await appPool.execute(`
     CREATE TABLE IF NOT EXISTS cache_word_cloud (
       cache_key VARCHAR(255) PRIMARY KEY,
       svg LONGTEXT,
@@ -67,7 +71,7 @@ async function ensureCacheTable() {
 }
 
 async function fetchCachedSvg(cacheKey: string) {
-  const [rows] = await pool.execute(
+  const [rows] = await appPool.execute(
     "SELECT svg FROM cache_word_cloud WHERE cache_key = ?",
     [cacheKey]
   );
@@ -75,7 +79,7 @@ async function fetchCachedSvg(cacheKey: string) {
 }
 
 async function storeCachedSvg(cacheKey: string, svg: string) {
-  await pool.execute(
+  await appPool.execute(
     `
     INSERT INTO cache_word_cloud (cache_key, svg)
     VALUES (?, ?)
@@ -121,6 +125,23 @@ async function wordCloudHandler(req: Request) {
     const searchWords = Array.isArray(body?.search_words)
       ? body.search_words.filter((item: unknown) => typeof item === "string")
       : [];
+
+    if (searchWords.length > MAX_SEARCH_WORDS) {
+      logSecurityEvent(req as any, "INVALID_INPUT", { error: "Too many search words" });
+      return NextResponse.json(
+        { error: "Invalid input", message: `search_words may not exceed ${MAX_SEARCH_WORDS} items` },
+        { status: 400 }
+      );
+    }
+    for (const word of searchWords) {
+      if (word.length > MAX_SEARCH_WORD_LENGTH || !SAFE_SEARCH_WORD_RE.test(word)) {
+        logSecurityEvent(req as any, "INVALID_INPUT", { error: "Invalid search word characters" });
+        return NextResponse.json(
+          { error: "Invalid input", message: "Search words may only contain letters, numbers, spaces, hyphens, and underscores" },
+          { status: 400 }
+        );
+      }
+    }
 
     if (!Array.isArray(items)) {
       logSecurityEvent(req as any, "INVALID_INPUT", { error: "Request body must include pmids" });

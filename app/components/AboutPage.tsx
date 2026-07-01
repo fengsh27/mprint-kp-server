@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import Image from 'next/image';
 
 export default function AboutPage() {
@@ -10,27 +10,38 @@ export default function AboutPage() {
     recommendedPublications: '',
     additionalComments: ''
   });
+  const honeypotRef = useRef<HTMLInputElement>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   const handleInputChange = (field: string, value: string) => {
-    setFeedback(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFeedback(prev => ({ ...prev, [field]: value }));
+    if (submitStatus !== 'idle') setSubmitStatus('idle');
   };
 
-  const handleSubmit = () => {
-    // Handle feedback submission here
-    console.log('Feedback submitted:', feedback);
-    // You can add API call here to submit feedback
-    alert('Thank you for your feedback!');
-    
-    // Reset form
-    setFeedback({
-      additionalData: '',
-      excludeData: '',
-      recommendedPublications: '',
-      additionalComments: ''
-    });
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setSubmitStatus('idle');
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          additional_data:           feedback.additionalData,
+          exclude_data:              feedback.excludeData,
+          recommended_publications:  feedback.recommendedPublications,
+          additional_comments:       feedback.additionalComments,
+          website:                   honeypotRef.current?.value ?? '',
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setSubmitStatus('success');
+      setFeedback({ additionalData: '', excludeData: '', recommendedPublications: '', additionalComments: '' });
+    } catch {
+      setSubmitStatus('error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -50,9 +61,6 @@ export default function AboutPage() {
             <nav className="flex space-x-8">
               <a href="/" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
                 Explore
-              </a>
-              <a href="#" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
-                How we help the community
               </a>
               <a href="/about" className="text-blue-600 border-b-2 border-blue-600 px-1 py-2 text-sm font-medium">
                 About
@@ -99,6 +107,18 @@ export default function AboutPage() {
             </p>
 
             <form className="space-y-6">
+              {/* Honeypot — hidden from humans, bots auto-fill it */}
+              <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
+                <label htmlFor="website">Website</label>
+                <input
+                  ref={honeypotRef}
+                  id="website"
+                  name="website"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   What additional data element would you like to add in the current knowledgebase?
@@ -151,12 +171,20 @@ export default function AboutPage() {
                 />
               </div>
 
+              {submitStatus === 'success' && (
+                <p className="text-green-600 text-sm font-medium">Thank you! Your feedback has been submitted.</p>
+              )}
+              {submitStatus === 'error' && (
+                <p className="text-red-600 text-sm font-medium">Something went wrong. Please try again.</p>
+              )}
+
               <button
                 type="button"
                 onClick={handleSubmit}
-                className="w-full bg-gray-300 text-gray-700 py-3 px-4 rounded-md font-medium hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+                disabled={submitting}
+                className="w-full bg-gray-300 text-gray-700 py-3 px-4 rounded-md font-medium hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Submit
+                {submitting ? 'Submitting…' : 'Submit'}
               </button>
             </form>
           </div>

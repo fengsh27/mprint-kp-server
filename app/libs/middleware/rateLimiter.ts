@@ -148,6 +148,54 @@ export const downloadRateLimiter = new RateLimiter({
   skipForLocalhost: true       // Skip rate limiting for localhost
 });
 
+export const feedbackRateLimiter = new RateLimiter({
+  windowMs: 60 * 60 * 1000,   // 1 hour
+  maxRequests: 5,              // 5 submissions per hour per IP
+  message: 'Too many feedback submissions, please try again later.',
+  statusCode: 429,
+  skipForLocalhost: true
+});
+
+// Global rate limiter — single shared counter across all IPs.
+// Useful for blocking IP-rotating attackers who would otherwise bypass per-IP limits.
+interface GlobalRateLimitConfig {
+  windowMs: number;
+  maxRequests: number;
+  message: string;
+  statusCode: number;
+}
+
+class GlobalRateLimiter {
+  private count = 0;
+  private resetTime = 0;
+  config: GlobalRateLimitConfig;
+
+  constructor(config: GlobalRateLimitConfig) {
+    this.config = config;
+    this.resetTime = Date.now() + config.windowMs;
+  }
+
+  check(): { allowed: boolean; remaining: number; resetTime: number } {
+    const now = Date.now();
+    if (now > this.resetTime) {
+      this.count = 0;
+      this.resetTime = now + this.config.windowMs;
+    }
+    if (this.count >= this.config.maxRequests) {
+      return { allowed: false, remaining: 0, resetTime: this.resetTime };
+    }
+    this.count++;
+    return { allowed: true, remaining: this.config.maxRequests - this.count, resetTime: this.resetTime };
+  }
+}
+
+export const feedbackGlobalLimiter = new GlobalRateLimiter({
+  windowMs: 5 * 60 * 1000,   // 5 minutes
+  maxRequests: 20,             // 20 submissions globally per 5 minutes
+  message: 'The feedback system is temporarily busy. Please try again in a few minutes.',
+  statusCode: 429,
+});
+
 // Rate limiting middleware function
 export function withRateLimit(
   handler: (req: NextRequest) => Promise<NextResponse>,
@@ -175,12 +223,23 @@ export function withRateLimit(
     }
 
     // Add rate limit headers to successful responses
-    const response = await handler(req);
-    Object.entries(limiter.getHeaders(rateLimit.remaining, rateLimit.resetTime))
-      .forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-    
+    let response: NextResponse;
+    try {
+      response = await handler(req);
+    } catch (err) {
+      console.error('Route handler threw unexpectedly:', err);
+      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+
+    try {
+      Object.entries(limiter.getHeaders(rateLimit.remaining, rateLimit.resetTime))
+        .forEach(([key, value]) => {
+          response.headers.set(key, value);
+        });
+    } catch {
+      // Socket already closed or headers committed — rate-limit headers are informational only.
+    }
+
     return response;
   };
 }

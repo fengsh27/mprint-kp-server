@@ -3,6 +3,7 @@
 import api from "./access-api";
 import { ConceptRow, PmidRow, SearchType, TypeData } from "../libs/database/types";
 import { PublicationTableRow } from "../components/component-utils";
+import { MAX_SEARCH_WORDS, MAX_SEARCH_WORD_LENGTH } from "../libs/constants";
 
 /** If you know the response shapes, replace `unknown` with your types. */
 export const daGetOverallStudyType = (opts?: { signal?: AbortSignal }) =>
@@ -48,7 +49,12 @@ export const daGetWordClouds = (
   pmids: PmidRow[],
   searchWords: string[],
   opts?: { signal?: AbortSignal }
-) => api.post<unknown>("/api/word_clouds", { pmids, search_words: searchWords }, opts);
+) => {
+  const safeWords = searchWords
+    .filter(w => typeof w === "string" && w.length <= MAX_SEARCH_WORD_LENGTH)
+    .slice(0, MAX_SEARCH_WORDS);
+  return api.post<unknown>("/api/word_clouds", { pmids, search_words: safeWords }, opts);
+};
 
 export type AuthorNetworkOptions = {
   maxNodes?: number;
