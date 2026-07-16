@@ -35,6 +35,7 @@ import {
   daGetAuthorNetwork,
   daGetPopulationData,
 } from "../dataprovider/dataaccessor";
+import versionInfo from "../version.json";
 import {
   ConceptRow,
   PmidRow,
@@ -741,6 +742,9 @@ export default function Home() {
                 </a>
               </div>
               <h1 className="text-xl font-semibold text-gray-900">Knowledge Portal (Silver)</h1>
+              <span className="text-xs font-mono text-gray-500 self-center">
+                v{versionInfo.version}
+              </span>
             </div>
             <nav className="flex space-x-8">
               <a href="/" className="text-gray-500 hover:text-gray-700 px-1 py-2 text-sm font-medium">
