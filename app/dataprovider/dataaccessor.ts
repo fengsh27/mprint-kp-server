@@ -15,6 +15,9 @@ export const daGetDrugList = (opts?: { signal?: AbortSignal }) =>
 export const daGetDiseaseList = (opts?: { signal?: AbortSignal }) =>
   api.get<unknown>("/api/static_data/disease", opts);
 
+export const daGetPopulationData = (opts?: { signal?: AbortSignal }) =>
+  api.get<unknown>("/api/static_data/population", opts);
+
 export const daGetConcepts = (
   drugName?: string,
   diseaseName?: string,
