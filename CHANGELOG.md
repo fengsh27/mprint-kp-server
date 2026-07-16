@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.21](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.20...v0.1.21) (2026-07-16)
+
+
+### Features
+
+* refresh static data cache and serve population data from it ([2cf2482](https://github.com/fengsh27/mprint-kp-server/commit/2cf2482648c41e15b6123615a9ad1a2f55ab71ff))
+
+
+### Bug Fixes
+
+* short-circuit file logging when logs directory creation fails ([80f743b](https://github.com/fengsh27/mprint-kp-server/commit/80f743b8657eda3439cf9fe6162f4145b1bafcdc))
+
 ### [0.1.20](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.19...v0.1.20) (2026-02-02)
 
 

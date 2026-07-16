@@ -1,6 +1,6 @@
 {
   "name": "mprint-kp-server",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,6 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "release": "standard-version",
+    "bump:patch": "standard-version --release-as patch",
+    "bump:minor": "standard-version --release-as minor",
+    "bump:major": "standard-version --release-as major",
+    "bump:dry": "standard-version --dry-run",
     "update-static-cache": "node --experimental-strip-types scripts/update_static_cache_json_file.ts"
   },
   "dependencies": {
