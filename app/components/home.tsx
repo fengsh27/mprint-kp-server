@@ -70,7 +70,11 @@ function calculatePlotData(populationData: any[]) {
     xaxis: {
       tickangle: -45,
       tickfont: { size: 12 },
-      title: { text: 'Population', font: { size: 12 } }
+      // Population names run up to ~25 chars ("Adverse Pregnancy Outcome"); rotated
+      // they need more room than a fixed bottom margin can budget for, so let Plotly
+      // measure the labels and push the title clear of them.
+      automargin: true,
+      title: { text: 'Population', font: { size: 12 }, standoff: 12 }
     },
     yaxis: {
       tickfont: { size: 10 },
