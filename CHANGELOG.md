@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.30](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.29...v0.1.30) (2026-07-17)
+
+
+### Bug Fixes
+
+* stop overview x-axis labels overlapping the "Population" title ([3588774](https://github.com/fengsh27/mprint-kp-server/commit/358877473484235049640f00bbd7143d44cf4c70))
+
 ### [0.1.29](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.28...v0.1.29) (2026-07-16)
 
 
