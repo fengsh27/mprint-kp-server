@@ -39,6 +39,27 @@ export const daGetExtraData = (
   opts?: { signal?: AbortSignal }
 ) => api.post<unknown>(`/api/extradata/${path}`, conceptIds, opts);
 
+export type LabelSectionResponse = {
+  set_id: string;
+  flag: string;
+  loinc: string;
+  section_name: string;
+  status: "ok" | "section_not_found" | "label_unavailable";
+  title: string | null;
+  html: string;
+  source_url: string;
+};
+
+/** Fetch the FDA label section text (from DailyMed) for a given set_id + flag. */
+export const daGetLabelSection = (
+  setId: string,
+  flag: string,
+  opts?: { signal?: AbortSignal }
+) => {
+  const params = new URLSearchParams({ set_id: setId, flag });
+  return api.get<LabelSectionResponse>(`/api/label_section?${params.toString()}`, opts);
+};
+
 export const daGetPMIDs = (conceptIds: ConceptRow[], searchType: SearchType, opts?: { signal?: AbortSignal }) =>
   api.post<unknown>("/api/pmid", { conceptIds, searchType }, opts);
 

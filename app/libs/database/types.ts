@@ -91,6 +91,8 @@ export type PKData = {
 
 export type LabelStatsData = {
   cui: string;
+  /** DailyMed SPL set identifier; used to fetch the label's section text. */
+  set_id: string;
   nursing_mothers: number;
   carcinogenesis_and_mutagenesis_and_impairment_of_fertility: number;
   pregnancy: number;

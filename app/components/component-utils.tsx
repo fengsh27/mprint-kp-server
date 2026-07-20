@@ -103,161 +103,87 @@ export const getAtcCustomIcon = (props: any) => {
   }
 };
 
-export const LabelStatsTableColumns = [{
-  key: "TITLE",
-  name: "TITLE",
-  width: 300,
-  minWidth: 200,
-  maxWidth: 500,
-  resizable: true,
-  renderCell: ({ row, column }: RenderCellProps) => (
-    <div title={row[column.key]} className="truncate">
-      {row[column.key]}
-    </div>
-  ),
-}, {
-  key: "nursing_mothers",
-  name: "Nursing Mothers",
-  width: 100,
-  minWidth: 100,
-  maxWidth: 150,
-  resizable: true,
-  headerRenderer: ({ column }: { column: any }) => (
-    <div
-      title={column.name}
-      className="truncate font-medium text-center"
-      style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-    >
-      {column.name}
-    </div>
-  ),
-  renderCell: ({ row, column }: RenderCellProps) => (
-    <div title={row[column.key]} className="truncate text-center">
-      {row[column.key]}
-    </div>
-  ),
-}, {
-  key: "carcinogenesis_and_mutagenesis_and_impairment_of_fertility",
-  name: "Carcinogenesis and Mutagenesis and Impairment of Fertility",
-  width: 200,
-  minWidth: 100,
-  maxWidth: 250,
-  resizable: true,
-  headerRenderer: ({ column }: { column: any }) => (
-    <div title={column.name} className="truncate font-medium">
-      {column.name}
-    </div>
-  ),
-  renderCell: ({ row, column }: RenderCellProps) => (
-    <div title={row[column.key]} className="truncate text-center">
-      {row[column.key]}
-    </div>
-  ),
-}, {
-  key: "pregnancy",
-  name: "Pregnancy",
-  width: 100,
-  minWidth: 100,
-  maxWidth: 150,
-  resizable: true,
-  headerRenderer: ({ column }: { column: any }) => (
-    <div title={column.name} className="truncate font-medium text-center">
-      {column.name}
-    </div>
-  ),
-  renderCell: ({ row, column }: RenderCellProps) => (
-    <div title={row[column.key]} className="truncate text-center">
-      {row[column.key]}
-    </div>
-  ),
-}, {
-  key: "pediatric_use",
-  name: "Pediatric Use",
-  width: 100,
-  minWidth: 100,
-  maxWidth: 150,
-  resizable: true,
-  headerRenderer: ({ column }: { column: any }) => (
-    <div title={column.name} className="truncate font-medium text-center">
-      {column.name}
-    </div>
-  ),
-  renderCell: ({ row, column }: RenderCellProps) => (
-    <div title={row[column.key]} className="truncate text-center">
-      {row[column.key]}
-    </div>
-  ),
-}, {
-  key: "teratogenic_effects",
-  name: "Teratogenic Effects",
-  width: 150,
-  minWidth: 100,
-  maxWidth: 200,
-  resizable: true,
-  headerRenderer: ({ column }: { column: any }) => (
-    <div title={column.name} className="truncate font-medium text-center">
-      {column.name}
-    </div>
-  ),
-  renderCell: ({ row, column }: RenderCellProps) => (
-    <div title={row[column.key]} className="truncate text-center">
-      {row[column.key]}
-    </div>
-  ),
-}, {
-  key: "pregnancy_or_breast_feeding",
-  name: "Pregnancy or Breast Feeding",
-  width: 200,
-  minWidth: 100,
-  maxWidth: 250,
-  resizable: true,
-  headerRenderer: ({ column }: { column: any }) => (
-    <div title={column.name} className="truncate font-medium text-center">
-      {column.name}
-    </div>
-  ),
-  renderCell: ({ row, column }: RenderCellProps) => (
-    <div title={row[column.key]} className="truncate text-center">
-      {row[column.key]}
-    </div>
-  ),
-}, {
-  key: "labor_and_delivery",
-  name: "Labor and Delivery",
-  width: 100,
-  minWidth: 100,
-  maxWidth: 150,
-  resizable: true,
-  headerRenderer: ({ column }: { column: any }) => (
-    <div title={column.name} className="truncate font-medium text-center">
-      {column.name}
-    </div>
-  ),
-  renderCell: ({ row, column }: RenderCellProps) => (
-    <div title={row[column.key]} className="truncate text-center">
-      {row[column.key]}
-    </div>
-  ),
-}, {
-  key: "nonteratogenic_effects",
-  name: "Non-Teratogenic Effects",
-  width: 100,
-  minWidth: 100,
-  maxWidth: 150,
-  resizable: true,
-  headerRenderer: ({ column }: { column: any }) => (
-    <div title={column.name} className="truncate font-medium text-center">
-      {column.name}
-    </div>
-  ),
-  renderCell: ({ row, column }: RenderCellProps) => (
-    <div title={row[column.key]} className="truncate text-center">
-      {row[column.key]}
-    </div>
-  ),
-}]
+/** The value buildLabelStatsTable writes for a present ("checked") section. */
+export const LABEL_CHECKED = "✅️";
+
+/** When a checked cell is clicked, DrugTab is told which label + section. */
+export type LabelSectionClick = (
+  setId: string,
+  flagKey: string,
+  sectionName: string,
+  drugTitle: string
+) => void;
+
+// The eight FDA-label section flag columns, in display order. Each renders
+// ✅️/❌️; a ✅️ is clickable to open the actual label-section text.
+const LABEL_FLAG_COLUMNS: Array<{ key: string; name: string; width: number; minWidth: number; maxWidth: number }> = [
+  { key: "nursing_mothers", name: "Nursing Mothers", width: 100, minWidth: 100, maxWidth: 150 },
+  { key: "carcinogenesis_and_mutagenesis_and_impairment_of_fertility", name: "Carcinogenesis and Mutagenesis and Impairment of Fertility", width: 200, minWidth: 100, maxWidth: 250 },
+  { key: "pregnancy", name: "Pregnancy", width: 100, minWidth: 100, maxWidth: 150 },
+  { key: "pediatric_use", name: "Pediatric Use", width: 100, minWidth: 100, maxWidth: 150 },
+  { key: "teratogenic_effects", name: "Teratogenic Effects", width: 150, minWidth: 100, maxWidth: 200 },
+  { key: "pregnancy_or_breast_feeding", name: "Pregnancy or Breast Feeding", width: 200, minWidth: 100, maxWidth: 250 },
+  { key: "labor_and_delivery", name: "Labor and Delivery", width: 100, minWidth: 100, maxWidth: 150 },
+  { key: "nonteratogenic_effects", name: "Non-Teratogenic Effects", width: 100, minWidth: 100, maxWidth: 150 },
+];
+
+/**
+ * Build the "Maternal and Pediatric Use in Labels" grid columns. Pass a click
+ * handler to make ✅️ cells open the corresponding FDA label section; omit it
+ * for a plain read-only grid.
+ */
+export const buildLabelStatsColumns = (onSectionClick?: LabelSectionClick) => [
+  {
+    key: "TITLE",
+    name: "TITLE",
+    width: 300,
+    minWidth: 200,
+    maxWidth: 500,
+    resizable: true,
+    renderCell: ({ row, column }: RenderCellProps) => (
+      <div title={row[column.key]} className="truncate">
+        {row[column.key]}
+      </div>
+    ),
+  },
+  ...LABEL_FLAG_COLUMNS.map(({ key, name, width, minWidth, maxWidth }) => ({
+    key,
+    name,
+    width,
+    minWidth,
+    maxWidth,
+    resizable: true,
+    headerRenderer: ({ column }: { column: any }) => (
+      <div title={column.name} className="truncate font-medium text-center">
+        {column.name}
+      </div>
+    ),
+    renderCell: ({ row, column }: RenderCellProps) => {
+      const value = row[column.key];
+      const checked = value === LABEL_CHECKED;
+      if (checked && onSectionClick && row.set_id) {
+        return (
+          <button
+            type="button"
+            title={`View "${name}" label section`}
+            className="w-full text-center cursor-pointer hover:bg-blue-50 rounded underline decoration-dotted underline-offset-2"
+            onClick={() => onSectionClick(row.set_id, column.key, name, row.TITLE)}
+          >
+            {value}
+          </button>
+        );
+      }
+      return (
+        <div title={value} className="truncate text-center">
+          {value}
+        </div>
+      );
+    },
+  })),
+];
 
 export interface LabelStatsTableRow {
+  set_id: string;
   TITLE: string;
   nursing_mothers: string;
   carcinogenesis_and_mutagenesis_and_impairment_of_fertility: string;
@@ -271,6 +197,7 @@ export interface LabelStatsTableRow {
 export const buildLabelStatsTable = (data: LabelStatsData[]): LabelStatsTableRow[] => {
   return data.map(item => {
     return {
+      set_id: item.set_id,
       TITLE: item.TITLE,
       nursing_mothers: item.nursing_mothers === 1 ? "✅️" : "❌️",
       carcinogenesis_and_mutagenesis_and_impairment_of_fertility: item.carcinogenesis_and_mutagenesis_and_impairment_of_fertility === 1 ? "✅️" : "❌️",

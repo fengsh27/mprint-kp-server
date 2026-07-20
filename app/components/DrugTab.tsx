@@ -1,15 +1,15 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Tree from "rc-tree";
 import "rc-tree/assets/index.css";
-import { Info, ChevronDown } from 'lucide-react';
+import { Info, ChevronDown, X, ExternalLink } from 'lucide-react';
 import * as Accordion from '@radix-ui/react-accordion';
 import 'react-data-grid/lib/styles.css';
 import { DataGrid } from 'react-data-grid';
-import { buildLabelStatsTable, LabelStatsTableColumns, LabelStatsTableRow, RCTreeNode } from './component-utils';
+import { buildLabelStatsTable, buildLabelStatsColumns, LabelStatsTableRow, RCTreeNode } from './component-utils';
 import { build_atc_tree, getAtcCustomIcon } from './component-utils';
 import { ConceptRow, EPCData, LabelStatsData, MOAData, PEData, PKData } from '../libs/database/types';
-import { daGetExtraData } from '../dataprovider/dataaccessor';
+import { daGetExtraData, daGetLabelSection, LabelSectionResponse } from '../dataprovider/dataaccessor';
 
 // Custom CSS for tree styling
 const treeStyles = `
@@ -59,6 +59,39 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [atcTree, setAtcTree] = useState<RCTreeNode[]>([]);
   const [labelStatsData, setLabelStatsData] = useState<LabelStatsTableRow[]>([]);
+
+  // Drawer showing the FDA label section text for a clicked ✅️ cell.
+  const [section, setSection] = useState<{
+    open: boolean;
+    loading: boolean;
+    error: string | null;
+    drugTitle: string;
+    sectionName: string;
+    data: LabelSectionResponse | null;
+  }>({ open: false, loading: false, error: null, drugTitle: '', sectionName: '', data: null });
+
+  const handleSectionClick = (
+    setId: string,
+    flagKey: string,
+    sectionName: string,
+    drugTitle: string
+  ) => {
+    setSection({ open: true, loading: true, error: null, drugTitle, sectionName, data: null });
+    daGetLabelSection(setId, flagKey)
+      .then((data) => setSection((s) => ({ ...s, loading: false, data })))
+      .catch((err) =>
+        setSection((s) => ({
+          ...s,
+          loading: false,
+          error: err?.message || 'Failed to load label section',
+        }))
+      );
+  };
+
+  const closeSection = () => setSection((s) => ({ ...s, open: false }));
+
+  // Columns are rebuilt once so ✅️ cells carry the click handler.
+  const labelColumns = useMemo(() => buildLabelStatsColumns(handleSectionClick), []);
 
 
   useEffect(() => {
@@ -373,9 +406,9 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
               <div className="px-6 pb-6">
                 <div className="space-y-4">
                                      <div className="h-96">
-                     <DataGrid 
-                       columns={LabelStatsTableColumns} 
-                       rows={labelStatsData} 
+                     <DataGrid
+                       columns={labelColumns}
+                       rows={labelStatsData}
                        className="rdg-light"
                        style={{ height: '100%' }}
                        defaultColumnOptions={{
@@ -390,6 +423,96 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
           </Accordion.Item>
         </Accordion.Root>
       </div>
+
+      {/* FDA label section drawer */}
+      {section.open && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={closeSection}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${section.sectionName} label section`}
+            className="relative h-full w-full max-w-xl bg-white shadow-xl flex flex-col"
+          >
+            <div className="flex items-start justify-between border-b border-gray-200 p-4">
+              <div className="pr-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {section.data?.section_name || section.sectionName}
+                </h3>
+                <p className="text-sm text-gray-500 truncate" title={section.drugTitle}>
+                  {section.drugTitle}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeSection}
+                className="text-gray-400 hover:text-gray-700"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 text-sm text-gray-800">
+              {section.loading && (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                </div>
+              )}
+
+              {!section.loading && section.error && (
+                <p className="text-red-600">
+                  Could not load this label section. Please try again later.
+                </p>
+              )}
+
+              {!section.loading && !section.error && section.data && (
+                <>
+                  {section.data.status === 'ok' && (
+                    <div
+                      className="label-section-content space-y-2 [&_h4]:font-semibold [&_h4]:mt-3 [&_table]:w-full [&_td]:border [&_td]:border-gray-200 [&_td]:px-2 [&_td]:py-1 [&_ul]:list-disc [&_ul]:pl-5"
+                      // Server-sanitized: only whitelisted tags are emitted and all
+                      // text nodes are HTML-escaped in extract-section.ts.
+                      dangerouslySetInnerHTML={{ __html: section.data.html }}
+                    />
+                  )}
+                  {section.data.status === 'section_not_found' && (
+                    <p className="text-gray-600">
+                      This label does not contain a separate “{section.sectionName}” section.
+                    </p>
+                  )}
+                  {section.data.status === 'label_unavailable' && (
+                    <p className="text-gray-600">
+                      The full label for this product is no longer available on DailyMed.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+
+            {section.data?.source_url && (
+              <div className="border-t border-gray-200 p-4">
+                <a
+                  href={section.data.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                >
+                  View full label on DailyMed
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+                <p className="mt-1 text-xs text-gray-400">
+                  Source: U.S. National Library of Medicine, DailyMed
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
