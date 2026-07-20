@@ -1,12 +1,12 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Tree from "rc-tree";
 import "rc-tree/assets/index.css";
 import { Info, ChevronDown, X, ExternalLink } from 'lucide-react';
 import * as Accordion from '@radix-ui/react-accordion';
 import 'react-data-grid/lib/styles.css';
 import { DataGrid } from 'react-data-grid';
-import { buildLabelStatsTable, buildLabelStatsColumns, LabelStatsTableRow, RCTreeNode } from './component-utils';
+import { buildLabelStatsTable, buildLabelStatsColumns, LABEL_CHECKED, LabelStatsTableRow, RCTreeNode } from './component-utils';
 import { build_atc_tree, getAtcCustomIcon } from './component-utils';
 import { ConceptRow, EPCData, LabelStatsData, MOAData, PEData, PKData } from '../libs/database/types';
 import { daGetExtraData, daGetLabelSection, LabelSectionResponse } from '../dataprovider/dataaccessor';
@@ -65,10 +65,32 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
     open: boolean;
     loading: boolean;
     error: string | null;
-    drugTitle: string;
     sectionName: string;
+    clickedTitle: string;
+    clickedSetId: string;
+    sourcedTitle: string | null; // label the shown text actually came from
     data: LabelSectionResponse | null;
-  }>({ open: false, loading: false, error: null, drugTitle: '', sectionName: '', data: null });
+  }>({
+    open: false,
+    loading: false,
+    error: null,
+    sectionName: '',
+    clickedTitle: '',
+    clickedSetId: '',
+    sourcedTitle: null,
+    data: null,
+  });
+
+  // Guards against a slower fallback loop overwriting a newer click's result.
+  const sectionRequestRef = useRef(0);
+
+  // labelColumns is memoized once, so its click handler would otherwise close
+  // over the initial empty rows; read the latest rows through a ref instead.
+  const labelStatsDataRef = useRef(labelStatsData);
+  labelStatsDataRef.current = labelStatsData;
+
+  // Cap how many sibling labels we try before giving up.
+  const MAX_SECTION_ATTEMPTS = 8;
 
   const handleSectionClick = (
     setId: string,
@@ -76,19 +98,64 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
     sectionName: string,
     drugTitle: string
   ) => {
-    setSection({ open: true, loading: true, error: null, drugTitle, sectionName, data: null });
-    daGetLabelSection(setId, flagKey)
-      .then((data) => setSection((s) => ({ ...s, loading: false, data })))
-      .catch((err) =>
-        setSection((s) => ({
-          ...s,
-          loading: false,
-          error: err?.message || 'Failed to load label section',
-        }))
-      );
+    const token = ++sectionRequestRef.current;
+
+    // Some valid set_ids aren't served by DailyMed's XML API, so build a
+    // fallback list: the clicked label first, then other rows of the same drug
+    // that have this same section checked. The regulatory section text is
+    // essentially the same across a drug's labels, so a live sibling answers
+    // the same question.
+    const seen = new Set<string>();
+    const candidates: Array<{ setId: string; title: string }> = [];
+    const addCandidate = (sid: string, title: string) => {
+      if (sid && !seen.has(sid)) {
+        seen.add(sid);
+        candidates.push({ setId: sid, title });
+      }
+    };
+    addCandidate(setId, drugTitle);
+    for (const row of labelStatsDataRef.current) {
+      if ((row as unknown as Record<string, string>)[flagKey] === LABEL_CHECKED) {
+        addCandidate(row.set_id, row.TITLE);
+      }
+    }
+    const tryList = candidates.slice(0, MAX_SECTION_ATTEMPTS);
+
+    setSection({
+      open: true,
+      loading: true,
+      error: null,
+      sectionName,
+      clickedTitle: drugTitle,
+      clickedSetId: setId,
+      sourcedTitle: null,
+      data: null,
+    });
+
+    (async () => {
+      for (const candidate of tryList) {
+        try {
+          const data = await daGetLabelSection(candidate.setId, flagKey);
+          if (sectionRequestRef.current !== token) return; // superseded
+          if (data.status === 'ok') {
+            setSection((s) => ({ ...s, loading: false, data, sourcedTitle: candidate.title }));
+            return;
+          }
+        } catch {
+          if (sectionRequestRef.current !== token) return; // superseded
+          // try the next candidate
+        }
+      }
+      if (sectionRequestRef.current !== token) return;
+      // No label could be displayed inline; the DailyMed link still works.
+      setSection((s) => ({ ...s, loading: false, data: null, error: 'unavailable' }));
+    })();
   };
 
   const closeSection = () => setSection((s) => ({ ...s, open: false }));
+
+  const dailyMedLink = (setId: string) =>
+    `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${setId}`;
 
   // Columns are rebuilt once so ✅️ cells carry the click handler.
   const labelColumns = useMemo(() => buildLabelStatsColumns(handleSectionClick), []);
@@ -443,8 +510,8 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
                 <h3 className="text-lg font-semibold text-gray-900">
                   {section.data?.section_name || section.sectionName}
                 </h3>
-                <p className="text-sm text-gray-500 truncate" title={section.drugTitle}>
-                  {section.drugTitle}
+                <p className="text-sm text-gray-500 truncate" title={section.clickedTitle}>
+                  {section.clickedTitle}
                 </p>
               </div>
               <button
@@ -465,51 +532,49 @@ export default function DrugTab({ selectedDrug, concepts }: DrugTabProps) {
               )}
 
               {!section.loading && section.error && (
-                <p className="text-red-600">
-                  Could not load this label section. Please try again later.
+                <p className="text-gray-600">
+                  This “{section.sectionName}” section can’t be displayed here. Use the
+                  link below to read the full label on DailyMed.
                 </p>
               )}
 
-              {!section.loading && !section.error && section.data && (
+              {!section.loading && !section.error && section.data?.status === 'ok' && (
                 <>
-                  {section.data.status === 'ok' && (
-                    <div
-                      className="label-section-content space-y-2 [&_h4]:font-semibold [&_h4]:mt-3 [&_table]:w-full [&_td]:border [&_td]:border-gray-200 [&_td]:px-2 [&_td]:py-1 [&_ul]:list-disc [&_ul]:pl-5"
-                      // Server-sanitized: only whitelisted tags are emitted and all
-                      // text nodes are HTML-escaped in extract-section.ts.
-                      dangerouslySetInnerHTML={{ __html: section.data.html }}
-                    />
-                  )}
-                  {section.data.status === 'section_not_found' && (
-                    <p className="text-gray-600">
-                      This label does not contain a separate “{section.sectionName}” section.
+                  {section.sourcedTitle && section.sourcedTitle !== section.clickedTitle && (
+                    <p className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      The label you selected isn’t available from DailyMed’s data
+                      service. Showing this section from a related label:{' '}
+                      <span className="font-medium">{section.sourcedTitle}</span>.
                     </p>
                   )}
-                  {section.data.status === 'label_unavailable' && (
-                    <p className="text-gray-600">
-                      The full label for this product is no longer available on DailyMed.
-                    </p>
-                  )}
+                  <div
+                    className="label-section-content space-y-2 [&_h4]:font-semibold [&_h4]:mt-3 [&_table]:w-full [&_td]:border [&_td]:border-gray-200 [&_td]:px-2 [&_td]:py-1 [&_ul]:list-disc [&_ul]:pl-5"
+                    // Server-sanitized: only whitelisted tags are emitted and all
+                    // text nodes are HTML-escaped in extract-section.ts.
+                    dangerouslySetInnerHTML={{ __html: section.data.html }}
+                  />
                 </>
               )}
             </div>
 
-            {section.data?.source_url && (
-              <div className="border-t border-gray-200 p-4">
-                <a
-                  href={section.data.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
-                >
-                  View full label on DailyMed
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-                <p className="mt-1 text-xs text-gray-400">
-                  Source: U.S. National Library of Medicine, DailyMed
-                </p>
-              </div>
-            )}
+            <div className="border-t border-gray-200 p-4">
+              <a
+                href={
+                  section.data?.status === 'ok' && section.data.source_url
+                    ? section.data.source_url
+                    : dailyMedLink(section.clickedSetId)
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+              >
+                View full label on DailyMed
+                <ExternalLink className="w-4 h-4" />
+              </a>
+              <p className="mt-1 text-xs text-gray-400">
+                Source: U.S. National Library of Medicine, DailyMed
+              </p>
+            </div>
           </div>
         </div>
       )}
