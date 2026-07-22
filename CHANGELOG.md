@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.31](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.30...v0.1.31) (2026-07-22)
+
+
+### Features
+
+* colour author network dots by dominant study type ([c39c3af](https://github.com/fengsh27/mprint-kp-server/commit/c39c3af9710165706e1277341efea2f3dd58fe0a)), closes [#2a78d6](https://github.com/fengsh27/mprint-kp-server/issues/2a78d6) [#eb6834](https://github.com/fengsh27/mprint-kp-server/issues/eb6834) [#1baf7](https://github.com/fengsh27/mprint-kp-server/issues/1baf7) [#52514](https://github.com/fengsh27/mprint-kp-server/issues/52514)
+* show FDA label section text in the Drug tab labels grid ([d2ec17a](https://github.com/fengsh27/mprint-kp-server/commit/d2ec17ab319d8681c3b50925652efe56b56c182b))
+
+
+### Bug Fixes
+
+* fall back to a sibling label when a section's label isn't served ([483de13](https://github.com/fengsh27/mprint-kp-server/commit/483de13695848b37c8221f57c1361fba0d367edc))
+
 ### [0.1.30](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.29...v0.1.30) (2026-07-17)
 
 
