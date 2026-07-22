@@ -375,6 +375,55 @@ export const queriedMeshTermRows = async (pmids: string[]) => {
   return { maternal, pediatric };
 };
 
+/**
+ * Lean pmid -> study-type lookup for the author network's node colouring.
+ * Only the three types the network coloured by are selected; `queriedType` is
+ * deliberately not reused here because its population/score joins are far more
+ * work than this needs. A pmid can carry more than one of the three types, so
+ * callers get one row per (pmid, type) pair.
+ */
+export const queriedStudyTypesByPmid = async (
+  pmids: string[]
+): Promise<{ pmid: string; type: string }[]> => {
+  if (!pmids || pmids.length === 0) {
+    return [];
+  }
+
+  const batchSize = 1000;
+  const totalBatches = Math.ceil(pmids.length / batchSize);
+  const rows: { pmid: string; type: string }[] = [];
+
+  for (let i = 0; i < pmids.length; i += batchSize) {
+    const batch = pmids.slice(i, i + batchSize);
+    const batchNumber = Math.floor(i / batchSize) + 1;
+    const sql = `
+      SELECT pmid, type
+      FROM new_study_type
+      WHERE pmid IN (${placeholders(batch.length)})
+        AND type IN ('PK', 'CT', 'PE')
+    `;
+
+    const batchRows = await timeBatchedQuery(
+      'queriedStudyTypesByPmid',
+      async () => {
+        const [result] = await pool.execute(sql, batch);
+        return (result as any[]).map((row) => ({
+          pmid: String(row.pmid),
+          type: String(row.type)
+        }));
+      },
+      batchNumber,
+      totalBatches,
+      batch.length,
+      { totalPmidCount: pmids.length }
+    );
+
+    rows.push(...batchRows);
+  }
+
+  return rows;
+};
+
 export const queriedAuthorRows = async (pmids: string[]): Promise<AuthorRow[]> => {
   if (!pmids || pmids.length === 0) {
     return [];

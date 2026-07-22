@@ -10,9 +10,13 @@ const CytoscapeComponent = dynamic(() => import('react-cytoscapejs'), {
   loading: () => <div className="w-full h-[520px] bg-gray-100 animate-pulse rounded" />
 });
 
+export type ColouredStudyType = 'PK' | 'CT' | 'PE';
+
 type AuthorNode = {
   id: string;
   size: number;
+  typeCounts?: Record<ColouredStudyType, number>;
+  dominantType?: ColouredStudyType | null;
 };
 
 type AuthorLink = {
@@ -43,31 +47,59 @@ const DEFAULT_MAX_NODE_SIZE = 40;
 const DEFAULT_MIN_EDGE_WIDTH = 0.6;
 const DEFAULT_MAX_EDGE_WIDTH = 2.6;
 const GRAPH_NODE_LIMIT = 500;
-const NODE_COLORS = [
-  '#4E79A7',
-  '#59A14F',
-  '#E15759',
-  '#B07AA1',
-  '#76B7B2',
-  '#EDC948',
-  '#F28E2B',
-  '#FF9DA7',
-  '#9C755F',
-  '#BAB0AC'
-];
+/**
+ * Node colour encodes the author's dominant study type (the type most of their
+ * retrieved papers carry; ties break PK > CT > PE, resolved server-side).
+ *
+ * These are the first three categorical slots of the validated palette, kept in
+ * fixed order. A network is a scatter-like form — any two nodes can end up
+ * adjacent — so the trio was validated with all pairs in play against the white
+ * canvas: worst CVD ΔE 9.2, worst normal-vision ΔE 24.0. `OTHER` is a
+ * deliberate neutral (authors with no PK/CT/PE papers, ~3% of records); it
+ * reads as grey on purpose so it never competes with the three identities.
+ *
+ * Aqua sits just under 3:1 contrast on white, so colour is never the only
+ * signal: the legend below the graph and the hover tooltip both name the type.
+ */
+const STUDY_TYPE_COLORS: Record<ColouredStudyType, string> = {
+  PK: '#2a78d6',
+  CT: '#eb6834',
+  PE: '#1baf7a'
+};
+const OTHER_TYPE_COLOR = '#52514e';
+
+const STUDY_TYPE_LABELS: Record<ColouredStudyType, string> = {
+  PK: 'Pharmacokinetics',
+  CT: 'Clinical Trial',
+  PE: 'Pharmacoepidemiology'
+};
+
+const nodeColorForType = (type?: ColouredStudyType | null) =>
+  (type && STUDY_TYPE_COLORS[type]) || OTHER_TYPE_COLOR;
 
 const FIT_PADDING = 10;
 
 
-const hashString = (value: string) => {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-};
-
 const renderNodeSize = (size: number) => Math.max(12, 8 + size * 14);
+
+/**
+ * Tooltip text for a node. The dominant study type is spelled out here as well
+ * as encoded in the dot colour, so the colour is never the only way to read it.
+ */
+const nodeTooltip = (node: any, collaboratorCount: number) => {
+  const dominant = node.data('dominantType') as ColouredStudyType | null;
+  const counts = node.data('typeCounts') as Record<ColouredStudyType, number> | null;
+  const lines = [
+    `Author: ${node.data('label')}`,
+    `Papers: ${node.data('paperCount') ?? 0}`,
+    `Collaborators: ${collaboratorCount}`,
+    `Study type: ${dominant ? `${dominant} — ${STUDY_TYPE_LABELS[dominant]}` : 'Other / none'}`
+  ];
+  if (counts) {
+    lines.push(`PK ${counts.PK ?? 0} · CT ${counts.CT ?? 0} · PE ${counts.PE ?? 0}`);
+  }
+  return lines.join('\n');
+};
 
 export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetworkTabProps) {
   const spacing = 1.0;
@@ -229,7 +261,9 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
         label: node.id,
         size: node.size,
         paperCount: node.size,
-        color: NODE_COLORS[hashString(node.id) % NODE_COLORS.length]
+        dominantType: node.dominantType ?? null,
+        typeCounts: node.typeCounts ?? null,
+        color: nodeColorForType(node.dominantType)
       }
     }));
 
@@ -458,7 +492,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       setHoverInfo({
         x: coords.x,
         y: coords.y,
-        content: `Author: ${node.data('label')}\nPapers: ${node.data('paperCount') ?? 0}\nCollaborators: ${collaboratorCount}`
+        content: nodeTooltip(node, collaboratorCount)
       });
     };
     const showEdgeHover = (event: any) => {
@@ -534,7 +568,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       setPinnedInfo({
         x: coords.x,
         y: coords.y,
-        content: `Author: ${node.data('label')}\nPapers: ${node.data('paperCount') ?? 0}\nCollaborators: ${collaboratorCount}`
+        content: nodeTooltip(node, collaboratorCount)
       });
     };
     const handleCanvasClick = (event: any) => {
@@ -604,7 +638,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
         setHoverInfo({
           x: pos.x + 30,
           y: pos.y + 30,
-          content: `Author: ${node.data('label')}\nPapers: ${node.data('paperCount') ?? 0}\nCollaborators: ${collaboratorCount}`
+          content: nodeTooltip(node, collaboratorCount)
         });
         return;
       }
@@ -621,7 +655,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       setPinnedInfo({
         x,
         y,
-        content: `Author: ${node.data('label')}\nPapers: ${node.data('paperCount') ?? 0}\nCollaborators: ${collaboratorCount}`
+        content: nodeTooltip(node, collaboratorCount)
       });
     };
 
@@ -685,7 +719,40 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
       </div>
 
       <div className="flex gap-4">
-        <div className="flex-1 min-w-0">
+        {/* Taller than the right panel's min-h-[560px] so the graph, not the
+            Authors panel, drives the row height — this spends the vertical space
+            the floated legend gave back on the graph itself. */}
+        <div className="relative flex-1 min-w-0 min-h-[620px]">
+          {/* Legend floats over the graph so it costs no vertical space, with a
+              fully transparent background. It is click-through
+              (pointer-events-none) so panning and node hover still work
+              underneath. Indented past the cytoscape panzoom widget, which
+              occupies the first ~46px of the graph. */}
+          <div className="pointer-events-none absolute left-14 top-2 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+            <span className="text-gray-500">Dot colour — most frequent study type:</span>
+            {(['PK', 'CT', 'PE'] as ColouredStudyType[]).map((type) => (
+              <span key={type} className="inline-flex items-center gap-1.5">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: STUDY_TYPE_COLORS[type] }}
+                  aria-hidden="true"
+                />
+                <span>
+                  {type} <span className="text-gray-400">({STUDY_TYPE_LABELS[type]})</span>
+                </span>
+              </span>
+            ))}
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: OTHER_TYPE_COLOR }}
+                aria-hidden="true"
+              />
+              <span>Other / none</span>
+            </span>
+            <span className="text-gray-400">Dot size — number of papers</span>
+          </div>
+
           <CytoscapeComponent
             elements={elements}
             layout={layout}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { queriedAuthorRows } from "../../libs/database/query_db";
+import { queriedAuthorRows, queriedStudyTypesByPmid } from "../../libs/database/query_db";
 import { withRateLimit, searchRateLimiter } from "../../libs/middleware/rateLimiter";
 import {
   InputValidator,
@@ -11,7 +11,24 @@ import {
 } from "../../libs/middleware/security";
 import { MAX_QUERIED_ARRAY_LENGTH } from "../../libs/constants";
 
-type AuthorNode = { id: string; size: number };
+/**
+ * Study types the author nodes are coloured by. The order is also the
+ * tie-break priority: if an author's top count is shared, the earliest type
+ * here wins (PK, then CT, then PE).
+ */
+const COLOURED_STUDY_TYPES = ["PK", "CT", "PE"] as const;
+export type ColouredStudyType = (typeof COLOURED_STUDY_TYPES)[number];
+
+type StudyTypeCounts = Record<ColouredStudyType, number>;
+
+type AuthorNode = {
+  id: string;
+  size: number;
+  /** Papers by this author carrying each type; a paper can count in several. */
+  typeCounts: StudyTypeCounts;
+  /** Highest-count type, ties broken PK > CT > PE; null if the author has none. */
+  dominantType: ColouredStudyType | null;
+};
 type AuthorLink = { source: string; target: string; weight: number };
 type AuthorSummary = {
   author: string;
@@ -28,8 +45,24 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function emptyTypeCounts(): StudyTypeCounts {
+  return { PK: 0, CT: 0, PE: 0 };
+}
+
+/** Highest count wins; ties fall back to COLOURED_STUDY_TYPES order. */
+function pickDominantType(counts: StudyTypeCounts): ColouredStudyType | null {
+  let best: ColouredStudyType | null = null;
+  for (const type of COLOURED_STUDY_TYPES) {
+    if (counts[type] > 0 && (best === null || counts[type] > counts[best])) {
+      best = type;
+    }
+  }
+  return best;
+}
+
 function buildNetwork(
   rows: { pmid: string; author: string }[],
+  pmidTypes: Map<string, Set<ColouredStudyType>>,
   maxNodes: number,
   maxEdges: number,
   minEdgeWeight: number
@@ -45,12 +78,19 @@ function buildNetwork(
   }
 
   const authorCounts = new Map<string, number>();
+  const authorTypeCounts = new Map<string, StudyTypeCounts>();
   const pairCounts = new Map<string, number>();
 
-  for (const authorsSet of pmidToAuthors.values()) {
+  for (const [pmid, authorsSet] of pmidToAuthors.entries()) {
     const authors = Array.from(authorsSet);
+    const types = pmidTypes.get(pmid);
     for (const author of authors) {
       authorCounts.set(author, (authorCounts.get(author) ?? 0) + 1);
+      if (types?.size) {
+        const counts = authorTypeCounts.get(author) ?? emptyTypeCounts();
+        for (const type of types) counts[type] += 1;
+        authorTypeCounts.set(author, counts);
+      }
     }
     for (let i = 0; i < authors.length; i += 1) {
       for (let j = i + 1; j < authors.length; j += 1) {
@@ -65,7 +105,10 @@ function buildNetwork(
   const nodes = Array.from(authorCounts.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, maxNodes)
-    .map(([id, size]) => ({ id, size }));
+    .map(([id, size]) => {
+      const typeCounts = authorTypeCounts.get(id) ?? emptyTypeCounts();
+      return { id, size, typeCounts, dominantType: pickDominantType(typeCounts) };
+    });
 
   const nodeSet = new Set(nodes.map((node) => node.id));
   const links: AuthorLink[] = [];
@@ -186,8 +229,19 @@ async function authorNetworkHandler(req: Request) {
     const maxEdges = clamp(Number(body?.maxEdges ?? DEFAULT_MAX_EDGES), 50, 200000);
     const minEdgeWeight = clamp(Number(body?.minEdgeWeight ?? DEFAULT_MIN_EDGE_WEIGHT), 1, 50);
 
-    const authorRows = await queriedAuthorRows(sanitizedPmids);
-    const network = buildNetwork(authorRows, maxNodes, maxEdges, minEdgeWeight);
+    const [authorRows, studyTypeRows] = await Promise.all([
+      queriedAuthorRows(sanitizedPmids),
+      queriedStudyTypesByPmid(sanitizedPmids)
+    ]);
+
+    const pmidTypes = new Map<string, Set<ColouredStudyType>>();
+    for (const row of studyTypeRows) {
+      const set = pmidTypes.get(row.pmid) ?? new Set<ColouredStudyType>();
+      set.add(row.type as ColouredStudyType);
+      pmidTypes.set(row.pmid, set);
+    }
+
+    const network = buildNetwork(authorRows, pmidTypes, maxNodes, maxEdges, minEdgeWeight);
     const authorSummaries = buildAuthorSummaries(authorRows);
 
     const requestEndTime = performance.now();
