@@ -46,6 +46,20 @@ const DEFAULT_MIN_NODE_SIZE = 10;
 const DEFAULT_MAX_NODE_SIZE = 40;
 const DEFAULT_MIN_EDGE_WIDTH = 0.6;
 const DEFAULT_MAX_EDGE_WIDTH = 2.6;
+
+/**
+ * Cytoscape scales edge width by the zoom level, so a fixed base width goes
+ * sub-pixel once the graph is zoomed out. With ~500 nodes the initial fit lands
+ * near zoom 0.28, where the base 0.6–2.6 range renders as 0.17–0.73px — every
+ * edge, even the heaviest, is thinner than one pixel.
+ *
+ * These are floors expressed in *screen* pixels: the base widths below are
+ * divided by the current zoom so an edge never renders thinner than this, while
+ * zooming in still thickens edges the normal way (the floor stops applying once
+ * the natural width exceeds it).
+ */
+const MIN_RENDERED_EDGE_WIDTH = 0.6;
+const MAX_RENDERED_EDGE_WIDTH = 2.6;
 const GRAPH_NODE_LIMIT = 500;
 /**
  * Node colour encodes the author's dominant study type (the type most of their
@@ -108,6 +122,8 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; content: string } | null>(null);
   const [pinnedInfo, setPinnedInfo] = useState<{ x: number; y: number; content: string } | null>(null);
   const [isCyReady, setIsCyReady] = useState(false);
+  /** Current zoom, used to keep edges above a minimum on-screen thickness. */
+  const [edgeZoom, setEdgeZoom] = useState(1);
   const [rightPanelExpanded, setRightPanelExpanded] = useState(true);
   const panelWidth = 420;
   const [searchTerm, setSearchTerm] = useState('');
@@ -251,6 +267,9 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
     });
     if (!Number.isFinite(min)) min = 0;
     if (!Number.isFinite(max)) max = 1;
+    // mapData divides by (max - min); when every visible edge shares a weight
+    // that is zero, which yields a NaN width and invisible edges.
+    if (max <= min) max = min + 1;
     return { min, max };
   }, [visibleLinks]);
 
@@ -461,6 +480,45 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
   useEffect(() => {
     scheduleFit(FIT_PADDING);
   }, [rightPanelExpanded, scheduleFit]);
+
+  // Track zoom so the edge-width floor can be expressed in screen pixels.
+  // Coalesced to a frame and quantised, so restyling only happens when the
+  // rendered thickness would actually change noticeably.
+  useEffect(() => {
+    if (!isCyReady || !cyRef.current) return;
+    const cy = cyRef.current;
+    let frame: number | null = null;
+    const syncZoom = () => {
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        const zoom = cy.zoom();
+        if (!Number.isFinite(zoom) || zoom <= 0) return;
+        setEdgeZoom((previous) =>
+          Math.abs(zoom - previous) / (previous || 1) > 0.1 ? zoom : previous
+        );
+      });
+    };
+    syncZoom();
+    cy.on('zoom', syncZoom);
+    return () => {
+      cy.off('zoom', syncZoom);
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [isCyReady, elements]);
+
+  /**
+   * Base widths handed to cytoscape. Dividing the screen-pixel floors by the
+   * current zoom keeps thin edges visible when zoomed out; once the natural
+   * width is already thicker, the defaults win and edges scale as usual.
+   */
+  const edgeWidthRange = useMemo(() => {
+    const zoom = edgeZoom > 0 ? edgeZoom : 1;
+    return {
+      min: Math.max(DEFAULT_MIN_EDGE_WIDTH, MIN_RENDERED_EDGE_WIDTH / zoom),
+      max: Math.max(DEFAULT_MAX_EDGE_WIDTH, MAX_RENDERED_EDGE_WIDTH / zoom)
+    };
+  }, [edgeZoom]);
 
 
   useEffect(() => {
@@ -791,7 +849,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
               {
                 selector: 'edge',
                 style: {
-                  width: `mapData(weight, ${edgeWeightStats.min}, ${edgeWeightStats.max}, ${DEFAULT_MIN_EDGE_WIDTH}, ${DEFAULT_MAX_EDGE_WIDTH})`,
+                  width: `mapData(weight, ${edgeWeightStats.min}, ${edgeWeightStats.max}, ${edgeWidthRange.min}, ${edgeWidthRange.max})`,
                   'line-color': '#4b5563',
                   opacity: 0.6,
                   'curve-style': 'haystack'
@@ -800,7 +858,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
               {
                 selector: 'edge:selected',
                 style: {
-                  width: `mapData(weight, ${edgeWeightStats.min}, ${edgeWeightStats.max}, ${DEFAULT_MIN_EDGE_WIDTH + 0.8}, ${DEFAULT_MAX_EDGE_WIDTH + 2.2})`,
+                  width: `mapData(weight, ${edgeWeightStats.min}, ${edgeWeightStats.max}, ${edgeWidthRange.min * 1.8}, ${edgeWidthRange.max * 1.8})`,
                   'line-color': '#1d4ed8',
                   opacity: 0.9
                 }
