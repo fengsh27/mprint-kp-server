@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.32](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.31...v0.1.32) (2026-07-22)
+
+
+### Bug Fixes
+
+* don't kill the server when a client disconnects mid-request ([b9bf49f](https://github.com/fengsh27/mprint-kp-server/commit/b9bf49f660d082c500e36b9be93e79b593749285))
+* keep author-network edges above a minimum on-screen width ([d418d0e](https://github.com/fengsh27/mprint-kp-server/commit/d418d0e53e75154072f4b59fc2b840d09780228f))
+
 ### [0.1.31](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.30...v0.1.31) (2026-07-22)
 
 
