@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.33](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.32...v0.1.33) (2026-08-06)
+
+
+### Features
+
+* add study-type and population filters to result tabs ([a95e324](https://github.com/fengsh27/mprint-kp-server/commit/a95e324832e5680c995e3c15cc8fc7b217116931))
+* refine the population filter grouping and styling ([5834f92](https://github.com/fengsh27/mprint-kp-server/commit/5834f9259e112a74ed0caf011385db735ddb12db))
+
+
+### Bug Fixes
+
+* don't crash the author network when the filter empties the graph ([61f97d9](https://github.com/fengsh27/mprint-kp-server/commit/61f97d902b8ba4e95572ec4b47b4db2e52c65108))
+* key the word-cloud cache on PMID-set content, not count ([b055195](https://github.com/fengsh27/mprint-kp-server/commit/b0551951e6698cb736541bb1aff485cd5e6369e2))
+
 ### [0.1.32](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.31...v0.1.32) (2026-07-22)
 
 
