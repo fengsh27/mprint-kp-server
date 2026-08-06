@@ -12,6 +12,7 @@ import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
 import PublicationTab from './PublicationTab';
 import DrugClassTab from './DrugClassTab';
+import StudyFilters from './StudyFilters';
 const AuthorNetworkTab = dynamic(() => import('./AuthorNetworkTab'), {
   ssr: false,
   loading: () => (
@@ -49,6 +50,39 @@ import { buildPublicationTable, PublicationTableRow } from './component-utils';
 
 const DEFAULT_LOGO_WIDTH = 150;
 const DEFAULT_LOGO_HEIGHT = 182;
+
+// The three study types the portal tracks (also the filter-bar options).
+const STUDY_TYPE_OPTIONS = [
+  { value: 'PK', label: 'Pharmacokinetics' },
+  { value: 'PE', label: 'Pharmacoepidemiology' },
+  { value: 'CT', label: 'Clinical Trial' },
+] as const;
+const ALL_STUDY_TYPES = STUDY_TYPE_OPTIONS.map((option) => option.value);
+
+// Stable display order for the population filter, mirroring the Overview
+// population bars (preparePopulationData). Anything not listed sorts to the end.
+const POPULATION_ORDER = [
+  'Pediatric', 'Fetus', 'Premature', 'Newborn', 'Neonate', 'Infant', 'Child',
+  'Maternal', 'Pregnant', 'Labor', 'Postpartum',
+];
+
+function orderPopulations(populations: string[]) {
+  return [...populations].sort((a, b) => {
+    const ia = POPULATION_ORDER.indexOf(a);
+    const ib = POPULATION_ORDER.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+
+function splitTokens(value: string | null | undefined) {
+  return (value || '')
+    .split(' / ')
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
 
 const logoSize = {
   w: 100,
@@ -174,6 +208,12 @@ export default function Home() {
   const [hasDrugSearched, setHasDrugSearched] = useState(false);
   const [isTabSwitching, setIsTabSwitching] = useState(false);
   const [pmidData, setPmidData] = useState<PmidRow[]>([]);
+  const [studyData, setStudyData] = useState<StudyData[]>([]);
+  // Live client-side filters over the fetched study rows. `selectedPopulations`
+  // is null when every population is selected (the default, unfiltered state);
+  // once the user deselects one it becomes an explicit list.
+  const [selectedStudyTypes, setSelectedStudyTypes] = useState<string[]>([...ALL_STUDY_TYPES]);
+  const [selectedPopulations, setSelectedPopulations] = useState<string[] | null>(null);
   const [publicationData, setPublicationData] = useState<PublicationTableRow[]>([]);
   const [publicationCount, setPublicationCount] = useState<number | null>(null);
   const [isLoadingPublications, setIsLoadingPublications] = useState(false);
@@ -187,6 +227,49 @@ export default function Home() {
     }
     return hashPmids(pmidData);
   }, [pmidData]);
+
+  // Populations actually present in the current result set, ordered for display.
+  const availablePopulations = useMemo(() => {
+    const seen = new Set<string>();
+    for (const row of studyData) {
+      for (const token of splitTokens(row.Population)) {
+        seen.add(token);
+      }
+    }
+    return orderPopulations([...seen]);
+  }, [studyData]);
+
+  const isFilterActive =
+    selectedStudyTypes.length !== ALL_STUDY_TYPES.length || selectedPopulations !== null;
+
+  // Study rows surviving the study-type + population filter. A row matches if
+  // any of its study types is selected AND (populations unfiltered OR any of its
+  // populations is selected). Study type / population are " / "-joined strings.
+  const filteredStudyData = useMemo(() => {
+    if (!isFilterActive) return studyData;
+    const typeSet = new Set(selectedStudyTypes);
+    const popSet = selectedPopulations ? new Set(selectedPopulations) : null;
+    return studyData.filter((row) => {
+      const types = splitTokens(row.StudyType);
+      if (!types.some((type) => typeSet.has(type))) return false;
+      if (!popSet) return true;
+      const pops = splitTokens(row.Population);
+      return pops.some((pop) => popSet.has(pop));
+    });
+  }, [studyData, selectedStudyTypes, selectedPopulations, isFilterActive]);
+
+  // PMID list feeding the word-cloud and author-network fetches. Unchanged when
+  // no filter is active so those views behave exactly as before.
+  const filteredPmidData = useMemo(() => {
+    if (!isFilterActive) return pmidData;
+    const keep = new Set(filteredStudyData.map((row) => String(row.PMID)));
+    return pmidData.filter((row) => keep.has(String(row.pmid)));
+  }, [pmidData, filteredStudyData, isFilterActive]);
+
+  const filteredPmidKey = useMemo(() => {
+    if (!filteredPmidData || filteredPmidData.length === 0) return '';
+    return hashPmids(filteredPmidData);
+  }, [filteredPmidData]);
 
   const [overallStudyType, setOverallStudyType] = useState({
     pk: {
@@ -370,12 +453,16 @@ export default function Home() {
     }
   }, []);
 
+  // Fetch the raw study rows for the current PMID set. Derivation (counts,
+  // charts, publication table) happens in a separate effect below so the live
+  // study-type / population filters can re-derive without re-fetching.
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
     let isActive = true;
 
     if (!pmidData || pmidData.length === 0 || !pmidKey) {
+      setStudyData([]);
       setPublicationData([]);
       setPublicationCount(0);
       setIsLoadingPublications(false);
@@ -397,45 +484,12 @@ export default function Home() {
       };
     }
 
-    const applyDerivedData = (studyData: StudyData[]) => {
-      const derivedTypeData = studyData.map(item => ({
-        pmid: item.PMID,
-        study_type: item.StudyType || "",
-        population: item.Population || "",
-        maternal_score_pk: item.maternal_score_pk ?? null,
-        maternal_score_pe: item.maternal_score_pe ?? null,
-        maternal_score_ct: item.maternal_score_ct ?? null,
-        pediatric_score_pk: item.pediatric_score_pk ?? null,
-        pediatric_score_pe: item.pediatric_score_pe ?? null,
-        pediatric_score_ct: item.pediatric_score_ct ?? null,
-      }));
-
-      const summaryStats = calculateSummaryStats(derivedTypeData);
-      setOverallStudyType(prev => ({
-        ...prev,
-        pk: { ...prev.pk, count: summaryStats.find(stat => stat.study_type.toLowerCase() === "pk")?.count ?? 0 },
-        pe: { ...prev.pe, count: summaryStats.find(stat => stat.study_type.toLowerCase() === "pe")?.count ?? 0 },
-        ct: { ...prev.ct, count: summaryStats.find(stat => stat.study_type.toLowerCase() === "ct")?.count ?? 0 },
-      }));
-
-      const pkPlotData = preparePlotData("PK", derivedTypeData);
-      const pePlotData = preparePlotData("PE", derivedTypeData);
-      const ctPlotData = preparePlotData("CT", derivedTypeData);
-      const thePopulationData = preparePopulationData(pkPlotData, pePlotData, ctPlotData);
-      setPopulationData(thePopulationData);
-    };
-
     setIsLoadingPublications(true);
-    setPublicationData([]);
 
     daGetStudy(pmidData, { signal })
       .then((data: any) => {
         if (!isActive) return;
-        const studyData = data as StudyData[];
-
-        applyDerivedData(studyData);
-        setPublicationData(buildPublicationTable(studyData));
-        setPublicationCount(studyData.length);
+        setStudyData(data as StudyData[]);
         setIsLoadingPublications(false);
         setIsLoadingPopulationData(false);
       })
@@ -451,6 +505,41 @@ export default function Home() {
       controller.abort();
     };
   }, [pmidData, pmidKey, hasActiveQuery, defaultPopulationData]);
+
+  // Derive Overview counts/charts and the Publication table from the *filtered*
+  // study rows. Re-runs on every filter toggle (no re-fetch). The empty / no-query
+  // resets are owned by the fetch effect above, so bail out here when empty.
+  useEffect(() => {
+    if (!hasActiveQuery || studyData.length === 0) return;
+
+    const derivedTypeData = filteredStudyData.map(item => ({
+      pmid: item.PMID,
+      study_type: item.StudyType || "",
+      population: item.Population || "",
+      maternal_score_pk: item.maternal_score_pk ?? null,
+      maternal_score_pe: item.maternal_score_pe ?? null,
+      maternal_score_ct: item.maternal_score_ct ?? null,
+      pediatric_score_pk: item.pediatric_score_pk ?? null,
+      pediatric_score_pe: item.pediatric_score_pe ?? null,
+      pediatric_score_ct: item.pediatric_score_ct ?? null,
+    }));
+
+    const summaryStats = calculateSummaryStats(derivedTypeData);
+    setOverallStudyType(prev => ({
+      ...prev,
+      pk: { ...prev.pk, count: summaryStats.find(stat => stat.study_type.toLowerCase() === "pk")?.count ?? 0 },
+      pe: { ...prev.pe, count: summaryStats.find(stat => stat.study_type.toLowerCase() === "pe")?.count ?? 0 },
+      ct: { ...prev.ct, count: summaryStats.find(stat => stat.study_type.toLowerCase() === "ct")?.count ?? 0 },
+    }));
+
+    const pkPlotData = preparePlotData("PK", derivedTypeData);
+    const pePlotData = preparePlotData("PE", derivedTypeData);
+    const ctPlotData = preparePlotData("CT", derivedTypeData);
+    setPopulationData(preparePopulationData(pkPlotData, pePlotData, ctPlotData));
+
+    setPublicationData(buildPublicationTable(filteredStudyData));
+    setPublicationCount(filteredStudyData.length);
+  }, [filteredStudyData, studyData, hasActiveQuery]);
 
   // Handle window resize for responsive charts
   useEffect(() => {
@@ -484,7 +573,7 @@ export default function Home() {
     const { signal } = controller;
     let isActive = true;
 
-    if (!pmidData || pmidData.length === 0 || !pmidKey) {
+    if (!filteredPmidData || filteredPmidData.length === 0 || !filteredPmidKey) {
       setMaternalWordCloudSvg("");
       setPediatricWordCloudSvg("");
       setIsLoadingWordCloud(false);
@@ -496,7 +585,7 @@ export default function Home() {
 
     setIsLoadingWordCloud(true);
     const searchWords = [selectedDrug, selectedDisease].filter(Boolean);
-    daGetWordClouds(pmidData, searchWords, { signal })
+    daGetWordClouds(filteredPmidData, searchWords, { signal })
       .then((data: any) => {
         if (!isActive) return;
         setMaternalWordCloudSvg(data?.maternal ?? "");
@@ -513,7 +602,7 @@ export default function Home() {
       isActive = false;
       controller.abort();
     };
-  }, [pmidData, pmidKey, selectedDrug, selectedDisease]);
+  }, [filteredPmidData, filteredPmidKey, selectedDrug, selectedDisease]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -527,7 +616,7 @@ export default function Home() {
       };
     }
 
-    if (!pmidData || pmidData.length === 0 || !pmidKey) {
+    if (!filteredPmidData || filteredPmidData.length === 0 || !filteredPmidKey) {
       setAuthorNetworkData(null);
       setAuthorNetworkError(null);
       setIsLoadingAuthorNetwork(false);
@@ -539,7 +628,7 @@ export default function Home() {
 
     setIsLoadingAuthorNetwork(true);
     setAuthorNetworkError(null);
-    daGetAuthorNetwork(pmidData, { minEdgeWeight: 1 }, { signal })
+    daGetAuthorNetwork(filteredPmidData, { minEdgeWeight: 1 }, { signal })
       .then((data: any) => {
         if (!isActive) return;
         setAuthorNetworkData(data ?? null);
@@ -556,7 +645,7 @@ export default function Home() {
       isActive = false;
       controller.abort();
     };
-  }, [pmidData, pmidKey, activeTab]);
+  }, [filteredPmidData, filteredPmidKey, activeTab]);
 
   function handleTabChange(value: string) {
     setIsTabSwitching(true);
@@ -565,11 +654,45 @@ export default function Home() {
     setTimeout(() => setIsTabSwitching(false), 150);
   }
 
+  function toggleStudyType(value: string) {
+    setSelectedStudyTypes(prev =>
+      prev.includes(value) ? prev.filter(type => type !== value) : [...prev, value]
+    );
+  }
+
+  function togglePopulation(value: string) {
+    setPopulationsSelected([value], !(selectedPopulations === null || selectedPopulations.includes(value)));
+  }
+
+  // Bulk add/remove a set of populations (used by the group parent checkboxes).
+  function setPopulationsSelected(values: string[], selected: boolean) {
+    setSelectedPopulations(prev => {
+      // null means "all selected"; materialise it before editing membership.
+      const set = new Set(prev === null ? availablePopulations : prev);
+      for (const value of values) {
+        if (selected) set.add(value);
+        else set.delete(value);
+      }
+      const next = availablePopulations.filter(pop => set.has(pop));
+      // Collapse back to the null (unfiltered) state when everything is on again.
+      return next.length === availablePopulations.length ? null : next;
+    });
+  }
+
+  function resetFilters() {
+    setSelectedStudyTypes([...ALL_STUDY_TYPES]);
+    setSelectedPopulations(null);
+  }
+
   const handleConceptChange = useDebouncedCallback((drug: string, disease: string) => {
     // Don't search if both parameters are empty
     if (!drug && !disease) {
       return;
     }
+
+    // A new search brings a different study set — clear any active filters so the
+    // population options (which are result-set specific) don't carry over stale.
+    resetFilters();
 
     // Set loading state for population data
     setIsLoadingPopulationData(true);
@@ -658,8 +781,10 @@ export default function Home() {
     }
     setConcepts([]);
     setPmidData([]);
+    setStudyData([]);
     setPublicationData([]);
     setHasDrugSearched(false);
+    resetFilters();
     setActiveTab('overview');
   }
 
@@ -713,12 +838,12 @@ export default function Home() {
   }
 
   async function handleDownload() {
-    if (!pmidData || pmidData.length === 0 || isExporting) {
+    if (!filteredPmidData || filteredPmidData.length === 0 || isExporting) {
       return;
     }
     setIsExporting(true);
     try {
-      const { blob, filename } = await daExportStudy(pmidData, downloadType);
+      const { blob, filename } = await daExportStudy(filteredPmidData, downloadType);
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = filename;
@@ -853,6 +978,21 @@ export default function Home() {
 
             </Tabs.List>
 
+            {hasActiveQuery && ['overview', 'publication', 'author-network'].includes(activeTab) && (
+              <StudyFilters
+                studyTypeOptions={STUDY_TYPE_OPTIONS.map(option => ({ ...option }))}
+                selectedStudyTypes={selectedStudyTypes}
+                onToggleStudyType={toggleStudyType}
+                availablePopulations={availablePopulations}
+                selectedPopulations={selectedPopulations}
+                onTogglePopulation={togglePopulation}
+                onSetPopulations={setPopulationsSelected}
+                onReset={resetFilters}
+                filteredCount={filteredStudyData.length}
+                totalCount={studyData.length}
+              />
+            )}
+
             <Tabs.Content
               value="overview"
               className="outline-none animate-in fade-in-0 slide-in-from-left-1 duration-300"
@@ -919,7 +1059,7 @@ export default function Home() {
                   <PublicationTab
                     publicationData={publicationData}
                     publicationCount={publicationCount}
-                    estimatedCount={pmidData.length}
+                    estimatedCount={filteredPmidData.length}
                     isLoading={isLoadingPublications}
                   />
                 )}
