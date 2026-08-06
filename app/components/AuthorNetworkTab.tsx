@@ -146,7 +146,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
     fitRafRef.current = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const cy = cyRef.current;
-        if (!cy) return;
+        if (!cy || cy.destroyed()) return;
         cy.resize();
         cy.fit(undefined, padding);
       });
@@ -453,18 +453,21 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
   }, [isFcoseReady]);
 
   useEffect(() => {
-    if (!cyRef.current) return;
     const cy = cyRef.current;
+    // Guard against a destroyed instance: clearing the filter to an empty set
+    // unmounts the graph (destroying cy) while this layout effect still re-runs.
+    if (!cy || cy.destroyed() || elements.length === 0) return;
     cy.layout(layout).run();
     cy.once('layoutstop', () => {
+      if (cy.destroyed()) return;
       scheduleFit(FIT_PADDING);
       cy.userZoomingEnabled(true);
       cy.userPanningEnabled(true);
     });
-  }, [layout, scheduleFit]);
+  }, [layout, scheduleFit, elements]);
 
   useEffect(() => {
-    if (!isCyReady || !cyRef.current) return;
+    if (!isCyReady || !cyRef.current || cyRef.current.destroyed()) return;
     const cy = cyRef.current;
     const container = cy.container?.();
     if (!container) return;
@@ -485,7 +488,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
   // Coalesced to a frame and quantised, so restyling only happens when the
   // rendered thickness would actually change noticeably.
   useEffect(() => {
-    if (!isCyReady || !cyRef.current) return;
+    if (!isCyReady || !cyRef.current || cyRef.current.destroyed()) return;
     const cy = cyRef.current;
     let frame: number | null = null;
     const syncZoom = () => {
@@ -522,7 +525,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
 
 
   useEffect(() => {
-    if (!isCyReady || !cyRef.current) return;
+    if (!isCyReady || !cyRef.current || cyRef.current.destroyed()) return;
     const cy = cyRef.current;
     const getTooltipPosition = (pos: { x: number; y: number }) => {
       if (!containerRef.current || !cy.container) {
@@ -585,7 +588,7 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
   }, [isCyReady]);
 
   useEffect(() => {
-    if (!isCyReady || !cyRef.current) return;
+    if (!isCyReady || !cyRef.current || cyRef.current.destroyed()) return;
     const cy = cyRef.current;
     const getTooltipPosition = (pos: { x: number; y: number }) => {
       if (!containerRef.current || !cy.container) {
