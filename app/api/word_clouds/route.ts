@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -200,9 +200,17 @@ async function wordCloudHandler(req: Request) {
     const pmids = items.map((item: any) => item.pmid);
     const sanitizedPmids = sanitizeInput(pmids);
 
+    // Key the cache on the *content* of the PMID set, not just its size. A study
+    // filter can produce different PMID subsets of the same length (e.g. "PK
+    // only" vs "PE only"), which would otherwise collide on the old count-based
+    // key and serve the wrong cached word cloud. Sorted so set identity — not
+    // ordering — drives the key.
+    const pmidFingerprint = createHash("sha1")
+      .update([...sanitizedPmids].sort().join(","))
+      .digest("hex");
     const searchKey = searchWords.join(",");
-    const maternalKey = `${searchKey}-${pmids.length}-maternal`;
-    const pediatricKey = `${searchKey}-${pmids.length}-pediatric`;
+    const maternalKey = `${searchKey}-${pmidFingerprint}-maternal`;
+    const pediatricKey = `${searchKey}-${pmidFingerprint}-pediatric`;
 
     await ensureCacheTable();
 
