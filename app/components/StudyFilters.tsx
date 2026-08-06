@@ -91,7 +91,7 @@ export default function StudyFilters({
     const umbrella = group.umbrella.filter((name) => available.has(name));
     const children = group.children.filter((name) => available.has(name));
     const members = [...umbrella, ...children];
-    return { label: group.label, children, members };
+    return { label: group.label, umbrella, children, members };
   }).filter((group) => group.members.length > 0);
 
   // Anything present but not covered by a group is shown flat under "Other".
@@ -108,7 +108,9 @@ export default function StudyFilters({
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
-        className="flex w-full items-center gap-3 px-4 py-2 text-left"
+        // Fixed min height so the taller "Reset" pill / "active" badge appearing
+        // doesn't grow the header row.
+        className="flex w-full items-center gap-3 px-4 min-h-[44px] text-left"
       >
         <ChevronDownIcon
           className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
@@ -198,7 +200,7 @@ export default function StudyFilters({
                     className="flex flex-wrap items-center gap-x-2.5 gap-y-1 border-l border-gray-200 pl-3 first-of-type:border-l-0 first-of-type:pl-0"
                   >
                     {/* Parent (select-all) */}
-                    <label className="flex items-center gap-1 font-medium text-gray-800">
+                    <label className="flex items-center gap-1 font-medium uppercase tracking-wide text-gray-800">
                       <input
                         type="checkbox"
                         checked={allOn}
@@ -210,11 +212,29 @@ export default function StudyFilters({
                       />
                       <span>{group.label}</span>
                     </label>
+                    {/* Umbrella: the bare group tag (studies tagged e.g.
+                        "Maternal" with no specific sub-population), shown as a
+                        normal chip so it can be toggled on its own. */}
+                    {group.umbrella.map((population) => (
+                      <label
+                        key={population}
+                        className="flex items-center gap-1 italic text-gray-600"
+                        title={`Tagged ${population} with no specific sub-population`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isPopulationChecked(population)}
+                          onChange={() => onTogglePopulation(population)}
+                          className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>{population}</span>
+                      </label>
+                    ))}
                     {/* Children */}
                     {group.children.map((population) => (
                       <label
                         key={population}
-                        className="flex items-center gap-1 text-gray-600"
+                        className="flex items-center gap-1 italic text-gray-600"
                       >
                         <input
                           type="checkbox"
@@ -232,11 +252,11 @@ export default function StudyFilters({
               {/* Other (ungrouped) */}
               {otherPopulations.length > 0 && (
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 border-l border-gray-200 pl-3">
-                  <span className="font-medium text-gray-800">Other</span>
+                  <span className="font-medium uppercase tracking-wide text-gray-800">Other</span>
                   {otherPopulations.map((population) => (
                     <label
                       key={population}
-                      className="flex items-center gap-1 text-gray-600"
+                      className="flex items-center gap-1 italic text-gray-600"
                     >
                       <input
                         type="checkbox"
