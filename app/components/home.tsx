@@ -44,6 +44,7 @@ import {
   StudyData
 } from '../libs/database/types';
 import { calculateSummaryStats, preparePlotData, preparePopulationData } from '../libs/dataprocessor/utils';
+import { orderPopulations, populationsOf } from '../libs/populations';
 import { buildPublicationTable, PublicationTableRow } from './component-utils';
 
 
@@ -58,24 +59,6 @@ const STUDY_TYPE_OPTIONS = [
   { value: 'CT', label: 'Clinical Trial' },
 ] as const;
 const ALL_STUDY_TYPES = STUDY_TYPE_OPTIONS.map((option) => option.value);
-
-// Stable display order for the population filter, mirroring the Overview
-// population bars (preparePopulationData). Anything not listed sorts to the end.
-const POPULATION_ORDER = [
-  'Pediatric', 'Fetus', 'Premature', 'Newborn', 'Neonate', 'Infant', 'Child',
-  'Maternal', 'Pregnant', 'Labor', 'Postpartum',
-];
-
-function orderPopulations(populations: string[]) {
-  return [...populations].sort((a, b) => {
-    const ia = POPULATION_ORDER.indexOf(a);
-    const ib = POPULATION_ORDER.indexOf(b);
-    if (ia === -1 && ib === -1) return a.localeCompare(b);
-    if (ia === -1) return 1;
-    if (ib === -1) return -1;
-    return ia - ib;
-  });
-}
 
 function splitTokens(value: string | null | undefined) {
   return (value || '')
@@ -229,10 +212,13 @@ export default function Home() {
   }, [pmidData]);
 
   // Populations actually present in the current result set, ordered for display.
+  // Tokens are normalized first, so the bare "Maternal" / "Pediatric" parent tags
+  // (which ride along on every study in their group) become the synthetic
+  // "(unspecified)" option only for studies that have no sub-type.
   const availablePopulations = useMemo(() => {
     const seen = new Set<string>();
     for (const row of studyData) {
-      for (const token of splitTokens(row.Population)) {
+      for (const token of populationsOf(row.Population)) {
         seen.add(token);
       }
     }
@@ -253,7 +239,7 @@ export default function Home() {
       const types = splitTokens(row.StudyType);
       if (!types.some((type) => typeSet.has(type))) return false;
       if (!popSet) return true;
-      const pops = splitTokens(row.Population);
+      const pops = populationsOf(row.Population);
       return pops.some((pop) => popSet.has(pop));
     });
   }, [studyData, selectedStudyTypes, selectedPopulations, isFilterActive]);

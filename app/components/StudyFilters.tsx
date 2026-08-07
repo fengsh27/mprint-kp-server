@@ -23,39 +23,13 @@ export interface StudyFiltersProps {
   totalCount: number;
 }
 
-// Two-level population grouping. Each group's `umbrella` token(s) (e.g. a study
-// tagged simply "Maternal") are folded into the parent checkbox, so the parent
-// acts as select-all over the umbrella + every child present. Synonyms cover the
-// raw cache vocabulary and the normalized names the Overview bars use.
-const POPULATION_GROUPS: Array<{ label: string; umbrella: string[]; children: string[] }> = [
-  {
-    label: 'Maternal',
-    umbrella: ['Maternal'],
-    children: [
-      'Preconception/Fertility',
-      'Pregnant', 'Pregnancy',
-      'Peripartum', 'Labor',
-      'Postpartum',
-      'Lactation',
-      'Adverse Pregnancy Outcome',
-    ],
-  },
-  {
-    label: 'Pediatric',
-    umbrella: ['Pediatric'],
-    children: [
-      'Fetal', 'Fetus',
-      'Neonatal', 'Neonate', 'Newborn', 'Premature',
-      'Infant',
-      'Child',
-      'Adolescent',
-    ],
-  },
-];
-
-const GROUPED_NAMES = new Set(
-  POPULATION_GROUPS.flatMap((group) => [...group.umbrella, ...group.children])
-);
+import {
+  POPULATION_GROUPS,
+  STANDALONE_POPULATIONS,
+  GROUPED_POPULATION_NAMES,
+  UNSPECIFIED_LABEL,
+  unspecifiedTooltip,
+} from '../libs/populations';
 
 // A live, client-side filter bar shown above the result tabs. It narrows the
 // already-fetched study rows by study type (PK/PE/CT) and population; every
@@ -86,16 +60,24 @@ export default function StudyFilters({
   const isPopulationChecked = (population: string) =>
     selectedPopulations === null || selectedPopulations.includes(population);
 
-  // Build the visible groups from whatever populations are present.
+  // Build the visible groups from whatever populations are present. The
+  // "(unspecified)" option is a synthetic token produced by
+  // normalizePopulationTokens — it stands for studies tagged with the group but
+  // no sub-type, and is listed last so the real sub-types read in stage order.
   const groups = POPULATION_GROUPS.map((group) => {
-    const umbrella = group.umbrella.filter((name) => available.has(name));
     const children = group.children.filter((name) => available.has(name));
-    const members = [...umbrella, ...children];
-    return { label: group.label, umbrella, children, members };
+    const unspecified = available.has(group.unspecified) ? group.unspecified : null;
+    const members = [...children, ...(unspecified ? [unspecified] : [])];
+    return { label: group.label, children, unspecified, members };
   }).filter((group) => group.members.length > 0);
 
+  // Its own category: an outcome rather than a stage of pregnancy.
+  const standalone = STANDALONE_POPULATIONS.filter((name) => available.has(name));
+
   // Anything present but not covered by a group is shown flat under "Other".
-  const otherPopulations = availablePopulations.filter((name) => !GROUPED_NAMES.has(name));
+  const otherPopulations = availablePopulations.filter(
+    (name) => !GROUPED_POPULATION_NAMES.has(name)
+  );
 
   const allStudyTypes = selectedStudyTypes.length === studyTypeOptions.length;
   const allPopulations = selectedPopulations === null;
@@ -185,7 +167,7 @@ export default function StudyFilters({
           </div>
 
           {/* Population (hierarchical, inline groups) */}
-          {(groups.length > 0 || otherPopulations.length > 0) && (
+          {(groups.length > 0 || standalone.length > 0 || otherPopulations.length > 0) && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                 Population
@@ -212,25 +194,7 @@ export default function StudyFilters({
                       />
                       <span>{group.label}</span>
                     </label>
-                    {/* Umbrella: the bare group tag (studies tagged e.g.
-                        "Maternal" with no specific sub-population), shown as a
-                        normal chip so it can be toggled on its own. */}
-                    {group.umbrella.map((population) => (
-                      <label
-                        key={population}
-                        className="flex items-center gap-1 italic text-gray-600"
-                        title={`Tagged ${population} with no specific sub-population`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isPopulationChecked(population)}
-                          onChange={() => onTogglePopulation(population)}
-                          className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span>{population}</span>
-                      </label>
-                    ))}
-                    {/* Children */}
+                    {/* Sub-types */}
                     {group.children.map((population) => (
                       <label
                         key={population}
@@ -245,14 +209,57 @@ export default function StudyFilters({
                         <span>{population}</span>
                       </label>
                     ))}
+                    {/* Studies tagged with the group but no sub-type. Listed
+                        last and dimmed so it reads as a catch-all. */}
+                    {group.unspecified && (
+                      <label
+                        className="flex items-center gap-1 italic text-gray-500"
+                        title={unspecifiedTooltip(group.label)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isPopulationChecked(group.unspecified)}
+                          onChange={() => onTogglePopulation(group.unspecified!)}
+                          className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>{UNSPECIFIED_LABEL}</span>
+                      </label>
+                    )}
                   </div>
                 );
               })}
 
+              {/* Adverse Pregnancy Outcome et al: forced onto their own line
+                  (basis-full) because they sit on a different axis from the
+                  stage-of-pregnancy / developmental-stage groups above. */}
+              {standalone.length > 0 && (
+                <div className="flex basis-full flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    Outcome
+                  </span>
+                  {standalone.map((population) => (
+                    <label
+                      key={population}
+                      className="flex items-center gap-1 italic text-gray-600"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isPopulationChecked(population)}
+                        onChange={() => onTogglePopulation(population)}
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>{population}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
               {/* Other (ungrouped) */}
               {otherPopulations.length > 0 && (
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 border-l border-gray-200 pl-3">
-                  <span className="font-medium uppercase tracking-wide text-gray-800">Other</span>
+                <div className="flex basis-full flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    Other
+                  </span>
                   {otherPopulations.map((population) => (
                     <label
                       key={population}

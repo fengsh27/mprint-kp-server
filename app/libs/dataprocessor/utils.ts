@@ -1,4 +1,5 @@
 import { PlotData, StudyTypeRecord, StudyTypeSummaryStat, StydyTypePopulationRecord } from "./types";
+import { POPULATION_CHART_CATEGORIES } from "../populations";
 
 export function calculateSummaryStats(data: StudyTypeRecord[]): StudyTypeSummaryStat[] {
   if (!data || data.length === 0) return [];
@@ -47,99 +48,21 @@ export function preparePlotData(studyType: string, data: StydyTypePopulationReco
     });
   });
 
-  // Build result with class assignment
-  return Object.entries(populationCounts).map(([population, count]) => {
-    let populationClass: 'P' | 'A' | 'S' | 'NA' | null = null;
-    if (["Child", "Fetus", "Infant", "Neonate", "Newborn", "Premature"].includes(population)) {
-      populationClass = 'P';
-    } else if (["Pregnant", "Labor", "Postpartum"].includes(population)) {
-      populationClass = 'A';
-    } else if (["Maternal", "Pediatric"].includes(population)) {
-      populationClass = 'S';
-    } else {
-      populationClass = 'NA';
-    }
-
-    return {
-      population,
-      count,
-      class: populationClass
-    };
-  });
+  return Object.entries(populationCounts).map(([population, count]) => ({
+    population,
+    count,
+  }));
 }
 
 export function preparePopulationData(pkPlotData: PlotData[], pePlotData: PlotData[], ctPlotData: PlotData[]): any[] {
-    return [{ 
-      name: 'Pediatric', 
-      pk: pkPlotData.find(d => d.population === 'Pediatric')?.count ?? 0, 
-      pe: pePlotData.find(d => d.population === 'Pediatric')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.population === 'Pediatric')?.count ?? 0, 
-      color: '#fbbf24' 
-    }, { 
-      name: 'Fetus', 
-      pk: pkPlotData.find(d => d.population === 'Fetus')?.count ?? 0, 
-      pe: pePlotData.find(d => d.population === 'Fetus')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.population === 'Fetus')?.count ?? 0, 
-      color: '#60a5fa' 
-    }, { 
-      name: 'Premature', 
-      pk: pkPlotData.find(d => d.population === 'Premature')?.count ?? 0, 
-      pe: pePlotData.find(d => d.population === 'Premature')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.population === 'Premature')?.count ?? 0, color: '#60a5fa' 
-    },
-    { 
-      name: 'Newborn', 
-      pk: pkPlotData.find(d => d.population === 'Newborn')?.count ?? 0, 
-      pe: pePlotData.find(d => d.population === 'Newborn')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.population === 'Newborn')?.count ?? 0, 
-      color: '#60a5fa' 
-    }, { 
-      name: 'Neonate', 
-      pk: pkPlotData.find(d => d.population === 'Neonate')?.count ?? 0, 
-      pe: pePlotData.find(d => d.population === 'Neonate')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.population === 'Neonate')?.count ?? 0, 
-      color: '#60a5fa' 
-    }, { 
-      name: 'Infant', 
-      pk: pkPlotData.find(d => d.population === 'Infant')?.count ?? 0, 
-      pe: pePlotData.find(d => d.population === 'Infant')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.population === 'Infant')?.count ?? 0, 
-      color: '#60a5fa' 
-    }, { 
-      name: 'Child', 
-      pk: pkPlotData.find(d => d.population === 'Child')?.count ?? 0, 
-      pe: pePlotData.find(d => d.population === 'Child')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.population === 'Child')?.count ?? 0, 
-      color: '#60a5fa' 
-    }, { 
-      name: 'Maternal', 
-      pk: pkPlotData.find(d => d.population === 'Maternal')?.count ?? 0, 
-      pe: pePlotData.find(d => d.population === 'Maternal')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.population === 'Maternal')?.count ?? 0, 
-      color: '#fbbf24' 
-    }, { 
-      name: 'Pregnant', 
-      pk: pkPlotData.find(d => d.population === 'Pregnant')?.count ?? 0, 
-      pe: pePlotData.find(d => d.population === 'Pregnant')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.population === 'Pregnant')?.count ?? 0, 
-      color: '#f87171' 
-    }, { 
-      name: 'Labor', 
-      pk: pkPlotData.find(d => d.population === 'Labor')?.count ?? 0, 
-      pe: pePlotData.find(d => d.population === 'Labor')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.population === 'Labor')?.count ?? 0, 
-      color: '#f87171' 
-    }, { 
-      name: 'Postpartum', 
-      pk: pkPlotData.find(d => d.population === 'Postpartum')?.count ?? 0, 
-      pe: pePlotData.find(d => d.population === 'Postpartum')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.population === 'Postpartum')?.count ?? 0, 
-      color: '#f87171' 
-    }, {
-      name: 'NA',
-      pk: pkPlotData.find(d => d.class === 'NA')?.count ?? 0, 
-      pe: pePlotData.find(d => d.class === 'NA')?.count ?? 0, 
-      ct: ctPlotData.find(d => d.class === 'NA')?.count ?? 0, 
-      color: '#60a5fa' 
-    }];
+  const countOf = (data: PlotData[], name: string) =>
+    data.find(d => d.population === name)?.count ?? 0;
+
+  return POPULATION_CHART_CATEGORIES.map(({ name, color }) => ({
+    name,
+    pk: countOf(pkPlotData, name),
+    pe: countOf(pePlotData, name),
+    ct: countOf(ctPlotData, name),
+    color,
+  }));
 }

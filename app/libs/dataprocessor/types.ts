@@ -17,7 +17,6 @@ export type StydyTypePopulationRecord = {
 export type PlotData = {
   population: string;
   count: number;
-  class: 'P' | 'A' | 'S' | 'NA' | null;
 };
 
 
