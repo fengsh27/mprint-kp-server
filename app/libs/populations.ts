@@ -91,8 +91,41 @@ export const POPULATION_CHART_CATEGORIES: Array<{ name: string; color: string }>
 // the heading next to it, so the chip itself just reads "Unspecified".
 export const UNSPECIFIED_LABEL = 'Unspecified';
 
+// Hover definitions for the population filter.
+//
+// NOTE: these describe what each term conventionally means, not the rule the
+// tagger actually applied. `new_population` is built outside this repo and its
+// criteria are not documented here, so the age ranges below are the usual
+// clinical conventions and should be reviewed by a domain expert before being
+// treated as authoritative (see also the planned definitions page).
+export const POPULATION_DEFINITIONS: Record<string, string> = {
+  Pediatric: 'Any pediatric population, from before birth through adolescence.',
+  Fetal: 'The unborn, from roughly 8 weeks of gestation until birth.',
+  Neonatal: 'Newborns, from birth to about 28 days.',
+  Infant: 'From about 28 days to 1 year old.',
+  Child: 'From about 1 to 12 years old.',
+  Adolescent: 'From about 13 to 18 years old.',
+
+  Maternal: 'Any maternal population, before, during or after pregnancy.',
+  'Preconception/Fertility':
+    'The period before conception, including fertility and planning or trying to conceive.',
+  Pregnant: 'During pregnancy, from conception to the onset of labor.',
+  Peripartum: 'Around the time of birth, covering late pregnancy, labor and delivery.',
+  Postpartum: 'After birth, usually the first six weeks.',
+  Lactation: 'Breastfeeding and milk production.',
+  'Adverse Pregnancy Outcome':
+    'An adverse result of pregnancy, such as preterm birth, pre-eclampsia, stillbirth or low birth weight. An outcome rather than a stage, so it can overlap any of the stages above.',
+};
+
+// Tooltip for a population option. Falls back to the bare name for anything not
+// in the table (the "Other" bucket), so unknown tags still get a sane title.
+export function populationTooltip(name: string) {
+  const definition = POPULATION_DEFINITIONS[name];
+  return definition ? `${name} — ${definition}` : name;
+}
+
 export function unspecifiedTooltip(groupLabel: string) {
-  return `Tagged ${groupLabel} with no specific sub-population`;
+  return `${groupLabel}, unspecified — tagged ${groupLabel} but with no specific sub-population identified. Studies here may also be tagged under the other group.`;
 }
 
 const UMBRELLA_TO_GROUP = new Map<string, PopulationGroup>(

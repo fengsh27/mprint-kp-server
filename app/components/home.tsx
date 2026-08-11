@@ -54,9 +54,21 @@ const DEFAULT_LOGO_HEIGHT = 182;
 
 // The three study types the portal tracks (also the filter-bar options).
 const STUDY_TYPE_OPTIONS = [
-  { value: 'PK', label: 'Pharmacokinetics' },
-  { value: 'PE', label: 'Pharmacoepidemiology' },
-  { value: 'CT', label: 'Clinical Trial' },
+  {
+    value: 'PK',
+    label: 'Pharmacokinetics',
+    description: 'How the body absorbs, distributes, metabolizes and clears a drug.',
+  },
+  {
+    value: 'PE',
+    label: 'Pharmacoepidemiology',
+    description: 'Use and effects of drugs in large populations.',
+  },
+  {
+    value: 'CT',
+    label: 'Clinical Trial',
+    description: 'Controlled studies evaluating the safety and efficacy of drugs in human subjects.',
+  },
 ] as const;
 const ALL_STUDY_TYPES = STUDY_TYPE_OPTIONS.map((option) => option.value);
 
@@ -261,7 +273,7 @@ export default function Home() {
     pk: {
       count: 0,
       label: "Pharmacokinetics",
-      description: "Studies examining the use and effects of drugs in large populations"
+      description: "Studies examining how the body absorbs, distributes, metabolizes and clears a drug"
     },
     pe: {
       count: 0,

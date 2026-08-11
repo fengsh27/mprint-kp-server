@@ -6,6 +6,8 @@ import { Filter, RotateCcw, ChevronDownIcon } from 'lucide-react';
 export interface StudyTypeOption {
   value: string;
   label: string;
+  // Longer hover definition; falls back to `label` when absent.
+  description?: string;
 }
 
 export interface StudyFiltersProps {
@@ -28,6 +30,7 @@ import {
   STANDALONE_POPULATIONS,
   GROUPED_POPULATION_NAMES,
   UNSPECIFIED_LABEL,
+  populationTooltip,
   unspecifiedTooltip,
 } from '../libs/populations';
 
@@ -153,7 +156,11 @@ export default function StudyFilters({
               <label
                 key={option.value}
                 className="flex items-center gap-1 text-gray-700"
-                title={option.label}
+                title={
+                  option.description
+                    ? `${option.label} — ${option.description}`
+                    : option.label
+                }
               >
                 <input
                   type="checkbox"
@@ -182,7 +189,10 @@ export default function StudyFilters({
                     className="flex flex-wrap items-center gap-x-2.5 gap-y-1 border-l border-gray-200 pl-3 first-of-type:border-l-0 first-of-type:pl-0"
                   >
                     {/* Parent (select-all) */}
-                    <label className="flex items-center gap-1 font-medium uppercase tracking-wide text-gray-800">
+                    <label
+                      className="flex items-center gap-1 font-medium uppercase tracking-wide text-gray-800"
+                      title={populationTooltip(group.label)}
+                    >
                       <input
                         type="checkbox"
                         checked={allOn}
@@ -199,6 +209,7 @@ export default function StudyFilters({
                       <label
                         key={population}
                         className="flex items-center gap-1 italic text-gray-600"
+                        title={populationTooltip(population)}
                       >
                         <input
                           type="checkbox"
@@ -241,6 +252,7 @@ export default function StudyFilters({
                     <label
                       key={population}
                       className="flex items-center gap-1 italic text-gray-600"
+                      title={populationTooltip(population)}
                     >
                       <input
                         type="checkbox"
@@ -264,6 +276,7 @@ export default function StudyFilters({
                     <label
                       key={population}
                       className="flex items-center gap-1 italic text-gray-600"
+                      title={populationTooltip(population)}
                     >
                       <input
                         type="checkbox"
