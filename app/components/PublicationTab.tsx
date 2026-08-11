@@ -6,6 +6,7 @@ import { DataGrid, type SortColumn } from 'react-data-grid';
 // import { daGetStudy } from '../dataprovider/dataaccessor';
 // import { PmidRow, StudyData, TypeData } from '../libs/database/types';
 import { PublicationTableRow } from './component-utils';
+import { ListCell, ListDialog, type ListDialogState } from './ListCell';
 
 // Custom styles for better text wrapping
 const customStyles = `
@@ -55,7 +56,18 @@ const formatScore = (value: unknown) => {
   return fixed.replace(/\.?0+$/, "");
 };
 
-const PublicationTableColumns = [
+// Rough character budgets for the list columns, sized from each column's width
+// against the 80px row height. Anything past the budget collapses into the
+// "+N more" button that opens the full list in a dialog.
+const LIST_CELL_BUDGETS = {
+  Population: 60,
+  StudiedDrugs: 120,
+  StudiedDiseases: 120,
+} as const;
+
+// Built as a function (rather than a module-level const) so the list cells can
+// reach the dialog state, matching buildLabelStatsColumns in component-utils.
+const buildPublicationTableColumns = (onExpand: (state: ListDialogState) => void) => [
   {
     key: "PMID",
     name: "PMID",
@@ -129,9 +141,13 @@ const PublicationTableColumns = [
     maxWidth: 150,
     resizable: true,
     renderCell: ({ row, column }: { row: any; column: any }) => (
-      <div className="break-words">
-        {row[column.key]}
-      </div>
+      <ListCell
+        value={row[column.key]}
+        budget={LIST_CELL_BUDGETS.Population}
+        columnName="Population"
+        rowTitle={row.Title}
+        onExpand={onExpand}
+      />
     ),
   },
   {
@@ -142,9 +158,13 @@ const PublicationTableColumns = [
     maxWidth: 400,
     resizable: true,
     renderCell: ({ row, column }: { row: any; column: any }) => (
-      <div className="break-words">
-        {row[column.key]}
-      </div>
+      <ListCell
+        value={row[column.key]}
+        budget={LIST_CELL_BUDGETS.StudiedDrugs}
+        columnName="Studied Drugs"
+        rowTitle={row.Title}
+        onExpand={onExpand}
+      />
     ),
   },
   {
@@ -155,9 +175,13 @@ const PublicationTableColumns = [
     maxWidth: 400,
     resizable: true,
     renderCell: ({ row, column }: { row: any; column: any }) => (
-      <div className="break-words">
-        {row[column.key]}
-      </div>
+      <ListCell
+        value={row[column.key]}
+        budget={LIST_CELL_BUDGETS.StudiedDiseases}
+        columnName="Studied Diseases"
+        rowTitle={row.Title}
+        onExpand={onExpand}
+      />
     ),
   },
   {
@@ -228,7 +252,11 @@ export default function PublicationTab({
   const [showEntries, setShowEntries] = useState(10);
   const [localPage, setLocalPage] = useState(1);
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
+  // Cell whose full list is currently shown in the dialog; null when closed.
+  const [listDialog, setListDialog] = useState<ListDialogState | null>(null);
   // const [publicationData, setPublicationData] = useState<PublicationTableRow[]>([]);
+
+  const columns = useMemo(() => buildPublicationTableColumns(setListDialog), []);
 
   const isServerSide =
     serverSide &&
@@ -403,7 +431,7 @@ export default function PublicationTab({
       {/* DataGrid */}
       <div className="min-h-[600px]">
         <DataGrid
-          columns={PublicationTableColumns}
+          columns={columns}
           rows={showPlaceholder ? placeholderData : paginatedData}
           sortColumns={sortColumns}
           onSortColumnsChange={setSortColumns}
@@ -544,6 +572,8 @@ export default function PublicationTab({
           </div>
         </div>
       )}
+
+      <ListDialog state={listDialog} onClose={() => setListDialog(null)} />
     </div>
   );
 }
