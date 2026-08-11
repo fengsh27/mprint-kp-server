@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.36](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.35...v0.1.36) (2026-08-11)
+
+
+### Features
+
+* add hover definitions to the population and study type filters ([f68a557](https://github.com/fengsh27/mprint-kp-server/commit/f68a557318cc64c1febc98fdf308b347f6393fcd))
+* add Unspecified sub-population and fix Overview population categories ([568c92d](https://github.com/fengsh27/mprint-kp-server/commit/568c92d19015c3a022f868d649aa9c053a14786d))
+* expand long publication-table cells in a dialog ([b04b188](https://github.com/fengsh27/mprint-kp-server/commit/b04b18871489ccb87a553d922450090ff608f3a0))
+
 ### [0.1.35](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.34...v0.1.35) (2026-08-06)
 
 ### [0.1.34](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.33...v0.1.34) (2026-08-06)
