@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.37](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.36...v0.1.37) (2026-08-13)
+
+
+### Features
+
+* explain the word clouds and the author network in-place ([6fa6720](https://github.com/fengsh27/mprint-kp-server/commit/6fa6720deaa57d625cce18ea721673f729612421))
+
 ### [0.1.36](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.35...v0.1.36) (2026-08-11)
 
 
