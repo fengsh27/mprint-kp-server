@@ -3,6 +3,7 @@
 import React from 'react';
 import { Edit, User, Plus } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import InfoPopover from './InfoPopover';
 
 // Dynamically import Plotly to prevent SSR issues
 const Plot = dynamic(() => import('react-plotly.js'), { 
@@ -22,7 +23,32 @@ interface OverviewTabProps {
   isLoadingWordCloud?: boolean;
 }
 
-export default function OverviewTab({ 
+// Explains what a word cloud is and how this one is built. The numbers match
+// app/libs/wordcloud.ts (MAX_TERMS and STOP_WORDS) — keep them in step.
+function WordCloudInfo({ group }: { group: 'maternal' | 'pediatric' }) {
+  return (
+    <InfoPopover label={`About the ${group} word cloud`} title="About this word cloud">
+      <p>
+        Each word is a MeSH term — a topic keyword the National Library of Medicine adds to every
+        PubMed paper.
+      </p>
+      <ul className="mt-1.5 list-disc space-y-1 pl-4">
+        <li>The bigger the word, the more of these papers carry that term.</li>
+        <li>
+          Built from the {group} papers that match your current search and filters, so it changes
+          when they do.
+        </li>
+        <li>Shows the 60 most common terms.</li>
+        <li>
+          Left out: very general terms (Humans, Female, Male, Animals, age groups) and the words you
+          searched for, because they sit on almost every paper here.
+        </li>
+      </ul>
+    </InfoPopover>
+  );
+}
+
+export default function OverviewTab({
   overallStudyType, 
   pkChartData, 
   pharmChartData, 
@@ -204,7 +230,10 @@ export default function OverviewTab({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {showMaternalWordCloud && (
             <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm min-h-[360px] flex flex-col">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Maternal MeSH word cloud</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-1.5">
+                Maternal MeSH word cloud
+                <WordCloudInfo group="maternal" />
+              </h3>
               {isLoadingWordCloud ? (
                 <div className="flex items-center justify-center h-full">
                   <p className="text-gray-500">Generating word cloud...</p>
@@ -219,7 +248,10 @@ export default function OverviewTab({
           )}
           {showPediatricWordCloud && (
             <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm min-h-[360px] flex flex-col">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Pediatric MeSH word cloud</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-1.5">
+                Pediatric MeSH word cloud
+                <WordCloudInfo group="pediatric" />
+              </h3>
               {isLoadingWordCloud ? (
                 <div className="flex items-center justify-center h-full">
                   <p className="text-gray-500">Generating word cloud...</p>

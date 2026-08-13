@@ -4,6 +4,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import cytoscape from 'cytoscape';
 import AuthorNetworkRightPanel from './AuthorNetworkRightPanel';
+import InfoPopover from './InfoPopover';
 
 const CytoscapeComponent = dynamic(() => import('react-cytoscapejs'), {
   ssr: false,
@@ -114,6 +115,47 @@ const nodeTooltip = (node: any, collaboratorCount: number) => {
   }
   return lines.join('\n');
 };
+
+/**
+ * What the graph means and how to read it. The floating legend already covers
+ * dot colour and dot size; this covers everything it cannot — what a line is,
+ * what the controls do, and the two limits that are otherwise invisible (the
+ * GRAPH_NODE_LIMIT cap and name-based author matching).
+ */
+function AuthorNetworkInfo() {
+  return (
+    <InfoPopover label="About the author network" title="About this network">
+      <p>
+        Who writes these papers together. Each dot is an author, and a line joins two authors who
+        appear on the same paper.
+      </p>
+      <ul className="mt-1.5 list-disc space-y-1 pl-4">
+        <li>Dot size — how many of these papers the author wrote.</li>
+        <li>Dot colour — the study type most of their papers carry.</li>
+        <li>Thicker line — the two wrote more papers together.</li>
+      </ul>
+      <p className="mt-2 font-medium text-gray-700">Using it</p>
+      <ul className="mt-1 list-disc space-y-1 pl-4">
+        <li>Hover or click a dot for the author&apos;s papers, collaborators and study types.</li>
+        <li>Click a line to see the two names and how many papers they share.</li>
+        <li>Drag to move, scroll to zoom, Fit to bring everything back into view.</li>
+        <li>Layout only rearranges the dots — it does not change the data.</li>
+        <li>
+          Current Page / All Authors switches between the authors listed on the current page and
+          everyone.
+        </li>
+      </ul>
+      <p className="mt-2 font-medium text-gray-700">Worth knowing</p>
+      <ul className="mt-1 list-disc space-y-1 pl-4">
+        <li>
+          With All Authors on, only the {GRAPH_NODE_LIMIT} authors with the most papers are drawn.
+        </li>
+        <li>Authors are matched by name, so two people with the same name share one dot.</li>
+        <li>It covers the papers matching your current search and filters, and changes with them.</li>
+      </ul>
+    </InfoPopover>
+  );
+}
 
 export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetworkTabProps) {
   const spacing = 1.0;
@@ -731,6 +773,10 @@ export default function AuthorNetworkTab({ data, isLoading, error }: AuthorNetwo
     <div ref={containerRef} className="relative bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex flex-wrap items-center gap-3">
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
+            Author network
+            <AuthorNetworkInfo />
+          </span>
           <button
             type="button"
             className="px-3 py-1 text-sm border border-gray-200 rounded hover:bg-gray-50"
