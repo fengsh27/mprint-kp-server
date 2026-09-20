@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 0.1.38 (2026-09-20)
+
+
+### Features
+
+* add 2,928 drug names so every adverse-event drug is searchable ([b7fc397](https://github.com/fengsh27/mprint-kp-server/commit/b7fc39792c7d4409e5217b13dca8b617dcb80787))
+* add Adverse Events tab backed by jiayi-server data in MySQL ([9d95d3e](https://github.com/fengsh27/mprint-kp-server/commit/9d95d3ee29ade85810f24cef3ff308913370d743))
+* add atc label and integrate drug class select to left pane ([#8](https://github.com/fengsh27/mprint-kp-server/issues/8)) ([d9ce7c3](https://github.com/fengsh27/mprint-kp-server/commit/d9ce7c3f1cef916811a4a515c7ccce00df9c22fc))
+* add hover definitions to the population and study type filters ([f68a557](https://github.com/fengsh27/mprint-kp-server/commit/f68a557318cc64c1febc98fdf308b347f6393fcd))
+* add scripts to save relevant scores to db ([#10](https://github.com/fengsh27/mprint-kp-server/issues/10)) ([9ffe65b](https://github.com/fengsh27/mprint-kp-server/commit/9ffe65b6fd088e6e7a74c0a8d77c5f0dba99e0bc))
+* add study-type and population filters to result tabs ([a95e324](https://github.com/fengsh27/mprint-kp-server/commit/a95e324832e5680c995e3c15cc8fc7b217116931))
+* add Unspecified sub-population and fix Overview population categories ([568c92d](https://github.com/fengsh27/mprint-kp-server/commit/568c92d19015c3a022f868d649aa9c053a14786d))
+* colour author network dots by dominant study type ([c39c3af](https://github.com/fengsh27/mprint-kp-server/commit/c39c3af9710165706e1277341efea2f3dd58fe0a)), closes [#2a78d6](https://github.com/fengsh27/mprint-kp-server/issues/2a78d6) [#eb6834](https://github.com/fengsh27/mprint-kp-server/issues/eb6834) [#1baf7](https://github.com/fengsh27/mprint-kp-server/issues/1baf7) [#52514](https://github.com/fengsh27/mprint-kp-server/issues/52514)
+* expand long publication-table cells in a dialog ([b04b188](https://github.com/fengsh27/mprint-kp-server/commit/b04b18871489ccb87a553d922450090ff608f3a0))
+* explain the word clouds and the author network in-place ([6fa6720](https://github.com/fengsh27/mprint-kp-server/commit/6fa6720deaa57d625cce18ea721673f729612421))
+* Implement author network ([#13](https://github.com/fengsh27/mprint-kp-server/issues/13)) ([6e0ed90](https://github.com/fengsh27/mprint-kp-server/commit/6e0ed90a11c5ef130d65393a0db3c1e49f4ca06b))
+* implement drug class mode ([#7](https://github.com/fengsh27/mprint-kp-server/issues/7)) ([d34a88d](https://github.com/fengsh27/mprint-kp-server/commit/d34a88d9b90955d87cf4770d98be33656549f45a))
+* implement drug class tab ([#6](https://github.com/fengsh27/mprint-kp-server/issues/6)) ([8f0ab26](https://github.com/fengsh27/mprint-kp-server/commit/8f0ab26a6f2787410fbd747e3bd98c21d9895191))
+* implement maternal and pediatric word clouds ([#12](https://github.com/fengsh27/mprint-kp-server/issues/12)) ([1236ceb](https://github.com/fengsh27/mprint-kp-server/commit/1236cebd73269b02bbb35caee06847af64f83d27))
+* publication ranking scores and optimize publications loading performance ([#11](https://github.com/fengsh27/mprint-kp-server/issues/11)) ([8f90aaa](https://github.com/fengsh27/mprint-kp-server/commit/8f90aaa984579831a64132a71ec7b9601854007b))
+* refine the population filter grouping and styling ([5834f92](https://github.com/fengsh27/mprint-kp-server/commit/5834f9259e112a74ed0caf011385db735ddb12db))
+* refresh static data cache and serve population data from it ([2cf2482](https://github.com/fengsh27/mprint-kp-server/commit/2cf2482648c41e15b6123615a9ad1a2f55ab71ff))
+* show FDA label section text in the Drug tab labels grid ([d2ec17a](https://github.com/fengsh27/mprint-kp-server/commit/d2ec17ab319d8681c3b50925652efe56b56c182b))
+* show version in header and guard version bumps ([dbd4aef](https://github.com/fengsh27/mprint-kp-server/commit/dbd4aefe9384c7a0f6dd8818843a54051ca3a33e))
+* support download publication data ([#3](https://github.com/fengsh27/mprint-kp-server/issues/3)) ([e6e34d0](https://github.com/fengsh27/mprint-kp-server/commit/e6e34d0e46f4f913639cdfa52e98ed6d6085918e))
+* support rate limit ([#5](https://github.com/fengsh27/mprint-kp-server/issues/5)) ([e479ac6](https://github.com/fengsh27/mprint-kp-server/commit/e479ac6d1a0671d6269c9667f7efadd749a10550))
+* support search query in url ([#4](https://github.com/fengsh27/mprint-kp-server/issues/4)) ([3ef054f](https://github.com/fengsh27/mprint-kp-server/commit/3ef054fb9b4f138e1971aa0f2cd8d80e59783d4e))
+
+
+### Bug Fixes
+
+* don't crash the author network when the filter empties the graph ([61f97d9](https://github.com/fengsh27/mprint-kp-server/commit/61f97d902b8ba4e95572ec4b47b4db2e52c65108))
+* don't kill the server when a client disconnects mid-request ([b9bf49f](https://github.com/fengsh27/mprint-kp-server/commit/b9bf49f660d082c500e36b9be93e79b593749285))
+* fall back to a sibling label when a section's label isn't served ([483de13](https://github.com/fengsh27/mprint-kp-server/commit/483de13695848b37c8221f57c1361fba0d367edc))
+* keep author-network edges above a minimum on-screen width ([d418d0e](https://github.com/fengsh27/mprint-kp-server/commit/d418d0e53e75154072f4b59fc2b840d09780228f))
+* key the word-cloud cache on PMID-set content, not count ([b055195](https://github.com/fengsh27/mprint-kp-server/commit/b0551951e6698cb736541bb1aff485cd5e6369e2))
+* short-circuit file logging when logs directory creation fails ([80f743b](https://github.com/fengsh27/mprint-kp-server/commit/80f743b8657eda3439cf9fe6162f4145b1bafcdc))
+* stop overview x-axis labels overlapping the "Population" title ([3588774](https://github.com/fengsh27/mprint-kp-server/commit/358877473484235049640f00bbd7143d44cf4c70))
+
 ### [0.1.37](https://github.com/fengsh27/mprint-kp-server/compare/v0.1.36...v0.1.37) (2026-08-13)
 
 
