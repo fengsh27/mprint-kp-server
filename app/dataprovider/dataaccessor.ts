@@ -4,6 +4,13 @@ import api from "./access-api";
 import { ConceptRow, PmidRow, SearchType, TypeData } from "../libs/database/types";
 import { PublicationTableRow } from "../components/component-utils";
 import { MAX_SEARCH_WORDS, MAX_SEARCH_WORD_LENGTH } from "../libs/constants";
+import type {
+  AeDrugSearchHit,
+  AeEvidenceResponse,
+  AeSimilarDrug,
+  AeSource,
+  AeSummary,
+} from "../libs/ae/types";
 
 /** If you know the response shapes, replace `unknown` with your types. */
 export const daGetOverallStudyType = (opts?: { signal?: AbortSignal }) =>
@@ -169,3 +176,31 @@ export const daGetDrugClassListByLevel = (
   level: 1 | 2 | 3,
   opts?: { signal?: AbortSignal }
 ) => api.get<unknown>(`/api/drug_class/list/${level}`, opts);
+
+// ---------------------------------------------------------------------------
+// Adverse events (jiayi-server data ported into kb_app; see app/libs/ae)
+// ---------------------------------------------------------------------------
+
+export const daGetAeSummary = (cuis: string[], opts?: { signal?: AbortSignal }) =>
+  api.post<AeSummary>("/api/ae/summary", { cuis }, opts);
+
+export const daGetAeEvidence = (
+  cuis: string[],
+  source: AeSource,
+  adverseEvent: string,
+  page: { limit?: number; offset?: number } = {},
+  opts?: { signal?: AbortSignal }
+) =>
+  api.post<AeEvidenceResponse>(
+    "/api/ae/evidence",
+    { cuis, source, adverse_event: adverseEvent, limit: page.limit ?? 20, offset: page.offset ?? 0 },
+    opts
+  );
+
+export const daSearchAeDrugs = (q: string, topK = 20, opts?: { signal?: AbortSignal }) => {
+  const params = new URLSearchParams({ q, top_k: String(topK) });
+  return api.get<{ query: string; results: AeDrugSearchHit[] }>(`/api/ae/search?${params.toString()}`, opts);
+};
+
+export const daGetAeSimilarDrugs = (cuis: string[], topK = 20, opts?: { signal?: AbortSignal }) =>
+  api.post<{ results: AeSimilarDrug[] }>("/api/ae/similar", { cuis, top_k: topK }, opts);
