@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { BarChart3, BookOpen, Network, Pill } from 'lucide-react';
+import { AlertTriangle, BarChart3, BookOpen, Network, Pill } from 'lucide-react';
 import Image from 'next/image';
 import * as Tabs from '@radix-ui/react-tabs';
 import { useQueryState } from 'nuqs';
@@ -12,6 +12,7 @@ import OverviewTab from './OverviewTab';
 import DrugTab from './DrugTab';
 import PublicationTab from './PublicationTab';
 import DrugClassTab from './DrugClassTab';
+import AdverseEventsTab from './AdverseEventsTab';
 import StudyFilters from './StudyFilters';
 const AuthorNetworkTab = dynamic(() => import('./AuthorNetworkTab'), {
   ssr: false,
@@ -954,6 +955,16 @@ export default function Home() {
                 </Tabs.Trigger>
               )}
 
+              {hasDrugSearched && (
+                <Tabs.Trigger
+                  value="adverse-events"
+                  className="flex items-center space-x-2 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>Adverse Events</span>
+                </Tabs.Trigger>
+              )}
+
               {concepts.length > 0 && (
                 <Tabs.Trigger
                   value="publication"
@@ -1040,6 +1051,21 @@ export default function Home() {
                   </div>
                 ) : (
                   <DrugTab selectedDrug={selectedDrug} concepts={concepts} />
+                )}
+              </Tabs.Content>
+            )}
+
+            {hasDrugSearched && (
+              <Tabs.Content
+                value="adverse-events"
+                className="outline-none animate-in fade-in-0 slide-in-from-right-1 duration-300"
+              >
+                {isTabSwitching && activeTab !== 'adverse-events' ? (
+                  <div className="flex items-center justify-center h-32">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : (
+                  <AdverseEventsTab selectedDrug={selectedDrug} concepts={concepts} />
                 )}
               </Tabs.Content>
             )}

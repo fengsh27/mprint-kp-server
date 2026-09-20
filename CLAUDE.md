@@ -24,11 +24,11 @@ This is a Next.js 15 App Router app (React 19 + TypeScript + Tailwind 4) that se
 
 ### Request flow (client → MySQL)
 
-1. **UI components** in `app/components/` (`home.tsx` is the root; tabs: `OverviewTab`, `DrugTab`, `DrugClassTab`, `PublicationTab`, `PKModelsTab`, `AuthorNetworkTab`, `WordCloud`). `AuthorNetworkTab` is dynamically imported (`ssr: false`) because it depends on `cytoscape`.
+1. **UI components** in `app/components/` (`home.tsx` is the root; tabs: `OverviewTab`, `DrugTab`, `AdverseEventsTab`, `DrugClassTab`, `PublicationTab`, `PKModelsTab`, `AuthorNetworkTab`, `WordCloud`). `AuthorNetworkTab` is dynamically imported (`ssr: false`) because it depends on `cytoscape`.
 2. **Data accessor layer** `app/dataprovider/`:
    - `access-api.ts` — typed `fetch` wrapper (`api.get/post/put/del`) with retries on 429/502/503/504, `ApiError` class, automatic JSON body handling, and `AbortSignal` support. Use this instead of raw `fetch` from the client.
    - `dataaccessor.ts` — `da*` functions (`daGetConcepts`, `daGetPMIDs`, `daGetStudy`, `daGetWordClouds`, `daGetAuthorNetwork`, `daExportStudy`, etc.) are the only API surface UI code should call.
-3. **Next.js route handlers** under `app/api/*/route.ts`: `concepts`, `pmid`, `extradata/{atc|epc|pe|moa|pk|label_stats}`, `type_population`, `mesh_terms`, `word_clouds`, `author_network`, `study` (+ `count`, `export`), `drug_class` (+ `list`), `static_data/*`, `download`, `test`. Each handler: validates input, rate-limits, calls query functions, adds security headers.
+3. **Next.js route handlers** under `app/api/*/route.ts`: `concepts`, `pmid`, `extradata/{atc|epc|pe|moa|pk|label_stats}`, `type_population`, `mesh_terms`, `word_clouds`, `author_network`, `study` (+ `count`, `export`), `drug_class` (+ `list`), `static_data/*`, `download`, `test`, `ae/{summary|evidence|search|similar}` (adverse events, see below). Each handler: validates input, rate-limits, calls query functions, adds security headers.
 4. **Query layer** `app/libs/database/query_db.ts` — all SQL lives here. Key conventions:
    - `placeholders(n)` builds `?,?,?` for `IN (...)` clauses with `mysql2` positional params; never string-interpolate user input.
    - Large PMID lists are **batched** (typically 1000; 10000 for `queriedStudyCount`) — follow this when adding new PMID-based queries.
@@ -61,13 +61,23 @@ Documented in `docs/database_schema.md`. Core tables the query layer hits:
 - `cache_full_study` — denormalized publication table for `/api/study` (built by `scripts/create_cache_full_study.py`).
 - `pubmed_author_affiliation` — used by the author-network feature.
 
+The app database (`APP_DB_NAME`, default `kb_app`, pool in `appdb.ts`) holds app-written tables: `feedback`, `cache_word_cloud`, `cache_label_section`, and the `ae_*` adverse-event tables.
+
+### Adverse events (`ae_*` tables, `AdverseEventsTab`)
+
+Ported from the jiayi-server Python service (fuzzy search + "one drug, four evidence sources"). `scripts/create_ae_tables.py` loads its CSV folder into nine `ae_*` tables in `kb_app` (documented in `docs/database_schema.md`). Everything is keyed by UMLS CUI, so the tab reuses the CUIs `/api/concepts` already resolved for the selected drug. Conventions:
+- All lookups go through `ae_cui_map` (portal CUI → jiayi CUI, including salt-form / combination roll-ups); never query `ae_*_finding` by CUI directly.
+- Queries live in `app/libs/database/query_ae.ts`; request validation in `app/libs/ae/validate.ts` (AE terms are free text, so it bounds length/characters instead of using the ASCII whitelist).
+- Highlighting (`app/libs/ae/highlight.ts`) is computed at request time from `ae_drug_term` names plus the AE term; the client renders the segment tree with `HighlightedText`.
+- To refresh the data, drop new CSVs into the jiayi folder and rerun the script (`--only <table>` rebuilds one table).
+
 ### Word cloud generation
 
 `/api/word_clouds` (route + `app/libs/wordcloud.ts`) fetches mesh-term rows, filters via `STOP_WORDS` and user keywords, writes a temp CSV, and shells out to `scripts/word_cloud_generator.py` via `execFile`. The Dockerfile explicitly copies this script and installs Python so both runtimes coexist at runtime.
 
 ### Python scripts
 
-`scripts/` contains one-shot ETL helpers (`process_maternal_database_with_scores.py`, `process_pediatric_database_with_scores.py`, `process_drug_class.py`, `create_cache_full_study.py`, `create_mesh_term_indexes.py`, `extract_author_from_pubmed.py`) plus the runtime `word_cloud_generator.py`. The ETL scripts build the MySQL tables the Next.js app queries — changing a query often means also updating the relevant script.
+`scripts/` contains one-shot ETL helpers (`process_maternal_database_with_scores.py`, `process_pediatric_database_with_scores.py`, `process_drug_class.py`, `create_cache_full_study.py`, `create_mesh_term_indexes.py`, `extract_author_from_pubmed.py`, `create_ae_tables.py`) plus the runtime `word_cloud_generator.py`. The ETL scripts build the MySQL tables the Next.js app queries — changing a query often means also updating the relevant script.
 
 ## Conventions
 

@@ -69,3 +69,24 @@
 | cate  | varchar(25) | YES  |     | NULL    |                |
 
 
+
+# Adverse-event tables (app database `kb_app`)
+
+Built by `scripts/create_ae_tables.py` from the jiayi-server CSV folder. All
+are keyed by UMLS CUI, the same identifier as `concept` / `new_pmid2drug`, and
+queried through `app/libs/database/query_ae.ts`.
+
+| Table | Rows (2026-09) | Purpose |
+| --- | --- | --- |
+| `ae_drug` | ~8.5k | One row per jiayi drug CUI: display `name`, `rxcui`, per-source record counts (`n_pubmed_human`, `n_pubmed_animal`, `n_fda_human`, `n_fda_animal`). |
+| `ae_drug_term` | ~21k | Every name known for a CUI (`term`, `cui`, `source` = evidence / identity / rxnorm_brand / rxnorm_ingredient / clinical_data). FULLTEXT on `term`. Used for typeahead and highlighting. |
+| `ae_cui_map` | ~9.9k | `cui` (jiayi) → `match_cui` (portal-facing); `kind` = self or rollup. Roll-ups map salt forms and combination products to their ingredient CUIs via `concept`. Every query joins through this table. |
+| `ae_term` | ~52k | Adverse-event vocabulary (`term`, `canonical`, `source`). FULLTEXT on `term`. |
+| `ae_drug_similarity` | ~13k | Tanimoto edges (`drug_a`, `drug_b`, `cui_a`, `cui_b`, `tanimoto`); undirected, stored once. |
+| `ae_abstract` | ~59k | `(pmid, corpus)` → `title`, `abstract`; corpus = human or animal. |
+| `ae_pubmed_finding` | ~156k | One extracted drug–event finding: `corpus`, `pmid`, `cui`, `rxcui`, `drug_name`, `adverse_event`, `population`, `species`, `dosage_value/unit`, `finding_type`, `confidence`, `reasoning`. Index on `(cui, adverse_event)`. |
+| `ae_label_finding` | ~101k | One FDA-label drug–event finding: `corpus`, `cui`, `drug_name`, `adverse_event`, `normalized_ae`, `population`, `species`, `age_range`, dosage, `section` (label section key, e.g. `pregnancy`), MedDRA PT / SOC. Index on `(cui, adverse_event)`. |
+| `ae_label_text` | ~34k | Label section text: `drug_key` (upper-cased label drug name), `section`, `seq`, `content`. Joined to `ae_label_finding` by name + section (the source matrix has no CUI column). |
+
+A comma-separated CUI cell in the source (combination product) is stored once
+per CUI, so each ingredient finds the row.
